@@ -1519,8 +1519,12 @@ function Quiz() {
 }
 
 // ========== Pray For Me ==========
+// نستخدم JSONBin API المجاني لتخزين الأسماء بشكل مشترك
+const JSONBIN_API = 'https://jsonbin-zeta.vercel.app/api/bins'
+const BIN_ID_KEY = 'thikr_prayer_bin_id'
+
 type PrayerRequest = {
-  id: number
+  id: string
   name: string
   note: string
   prayed: number
@@ -1530,53 +1534,148 @@ type PrayerRequest = {
 function PrayForMe() {
   const [name, setName] = useState('')
   const [note, setNote] = useState('')
-  const [requests, setRequests] = useState<PrayerRequest[]>(() => {
-    try {
-      return JSON.parse(localStorage.getItem('prayer_requests') || '[]')
-    } catch {
-      return []
-    }
+  const [requests, setRequests] = useState<PrayerRequest[]>([])
+  const [loading, setLoading] = useState(true)
+  const [submitting, setSubmitting] = useState(false)
+  const [binId, setBinId] = useState<string | null>(() => {
+    try { return localStorage.getItem(BIN_ID_KEY) } catch { return null }
   })
+  const [error, setError] = useState('')
 
+  // جلب البيانات من السيرفر
+  const fetchRequests = async (id: string) => {
+    try {
+      const r = await fetch(`${JSONBIN_API}/${id}`)
+      if (!r.ok) throw new Error('Not found')
+      const data = await r.json()
+      const items = Array.isArray(data.requests) ? data.requests : []
+      // ترتيب من الأحدث للأقدم وحذف القديم (أكثر من 7 أيام)
+      const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000
+      const filtered = items
+        .filter((item: PrayerRequest) => new Date(item.createdAt).getTime() > weekAgo)
+        .sort((a: PrayerRequest, b: PrayerRequest) => 
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        )
+        .slice(0, 50) // أقصى 50 اسم
+      setRequests(filtered)
+      setError('')
+    } catch {
+      setRequests([])
+    }
+  }
+
+  // حفظ البيانات للسيرفر
+  const saveRequests = async (id: string, items: PrayerRequest[]) => {
+    try {
+      await fetch(`${JSONBIN_API}/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requests: items })
+      })
+    } catch {
+      // ignore
+    }
+  }
+
+  // إنشاء bin جديد أو جلب الموجود
   useEffect(() => {
-    try { localStorage.setItem('prayer_requests', JSON.stringify(requests)) } catch {}
-  }, [requests])
+    const init = async () => {
+      setLoading(true)
+      
+      // نستخدم bin واحد ثابت لكل المستخدمين
+      // نخزن الـ ID في localStorage أول مرة ثم نستخدمه
+      const sharedBinId = 'thikr-shared-prayers-v1'
+      
+      try {
+        // محاولة جلب البيانات من bin موجود
+        const r = await fetch(`${JSONBIN_API}/${sharedBinId}`)
+        if (r.ok) {
+          setBinId(sharedBinId)
+          await fetchRequests(sharedBinId)
+        } else {
+          // إنشاء bin جديد
+          const createRes = await fetch(JSONBIN_API, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ requests: [], id: sharedBinId })
+          })
+          if (createRes.ok) {
+            const data = await createRes.json()
+            const newId = data.id || sharedBinId
+            setBinId(newId)
+            try { localStorage.setItem(BIN_ID_KEY, newId) } catch {}
+          }
+        }
+      } catch {
+        setError('تعذر الاتصال بالسيرفر')
+      }
+      
+      setLoading(false)
+    }
+    
+    init()
+  }, [])
 
-  const addRequest = () => {
+  // تحديث البيانات كل 30 ثانية
+  useEffect(() => {
+    if (!binId) return
+    const interval = setInterval(() => fetchRequests(binId), 30000)
+    return () => clearInterval(interval)
+  }, [binId])
+
+  const addRequest = async () => {
     const cleanName = name.trim()
-    if (!cleanName) return
+    if (!cleanName || !binId) return
 
-    setRequests(prev => [
-      {
-        id: Date.now(),
-        name: cleanName,
-        note: note.trim(),
-        prayed: 0,
-        createdAt: new Date().toISOString(),
-      },
-      ...prev,
-    ])
+    setSubmitting(true)
+    
+    const newItem: PrayerRequest = {
+      id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+      name: cleanName,
+      note: note.trim(),
+      prayed: 0,
+      createdAt: new Date().toISOString(),
+    }
+
+    const newList = [newItem, ...requests].slice(0, 50)
+    setRequests(newList)
     setName('')
     setNote('')
+    
+    await saveRequests(binId, newList)
+    setSubmitting(false)
   }
 
-  const prayFor = (id: number) => {
-    setRequests(prev => prev.map(item => (
+  const prayFor = async (id: string) => {
+    if (!binId) return
+    const newList = requests.map(item => 
       item.id === id ? { ...item, prayed: item.prayed + 1 } : item
-    )))
+    )
+    setRequests(newList)
+    await saveRequests(binId, newList)
   }
 
-  const removeRequest = (id: number) => {
-    setRequests(prev => prev.filter(item => item.id !== id))
+  const refreshData = async () => {
+    if (!binId) return
+    setLoading(true)
+    await fetchRequests(binId)
+    setLoading(false)
   }
 
-  const shareRequest = (item: PrayerRequest) => {
-    const text = `ادعوا ل${item.name} بظهر الغيب${item.note ? `: ${item.note}` : ''}`
-    if (navigator.share) {
-      navigator.share({ text }).catch(() => {})
-      return
-    }
-    navigator.clipboard?.writeText(text).catch(() => {})
+  if (loading) {
+    return (
+      <div style={{ textAlign: 'center', padding: '60px 20px' }}>
+        <div style={{
+          width: 50, height: 50,
+          border: '4px solid #a7f3d0',
+          borderTop: '4px solid #059669',
+          borderRadius: '50%',
+          animation: 'spin 1s linear infinite',
+          margin: '0 auto 16px'
+        }} />
+        <p style={{ color: '#065f46' }}>جاري التحميل...</p>
+      </div>
+    )
   }
 
   return (
@@ -1584,6 +1683,21 @@ function PrayForMe() {
       <div style={{ textAlign: 'center', marginBottom: 20 }}>
         <span style={styles.badge('#ecfdf5', '#047857')}>🤲 ادعوا لي بظهر الغيب</span>
       </div>
+
+      {error && (
+        <div style={{
+          background: '#fef2f2',
+          border: '1px solid #fca5a5',
+          borderRadius: 12,
+          padding: 12,
+          marginBottom: 16,
+          color: '#dc2626',
+          textAlign: 'center',
+          fontSize: 14
+        }}>
+          {error}
+        </div>
+      )}
 
       <div style={{
         background: 'linear-gradient(135deg,#ecfdf5,#d1fae5)',
@@ -1593,12 +1707,13 @@ function PrayForMe() {
         marginBottom: 16
       }}>
         <p style={{ color: '#065f46', fontSize: 14, lineHeight: 1.8, textAlign: 'center', marginBottom: 14 }}>
-          اكتب اسمك أو اسم شخص تحب أن يدعو له من يفتح التطبيق. البيانات محفوظة على هذا الجهاز.
+          ✨ اكتب اسمك أو اسم من تحب ليدعو لك كل من يفتح التطبيق
         </p>
         <input
           value={name}
           onChange={e => setName(e.target.value)}
           placeholder="الاسم..."
+          maxLength={50}
           style={{
             width: '100%',
             padding: '12px 14px',
@@ -1612,8 +1727,9 @@ function PrayForMe() {
         <textarea
           value={note}
           onChange={e => setNote(e.target.value)}
-          placeholder="دعوة مطلوبة اختياريًا، مثل: الشفاء، الرحمة، التوفيق..."
-          rows={3}
+          placeholder="دعوة مطلوبة (اختياري): الشفاء، الرحمة، التوفيق..."
+          rows={2}
+          maxLength={100}
           style={{
             width: '100%',
             padding: '12px 14px',
@@ -1622,26 +1738,46 @@ function PrayForMe() {
             marginBottom: 10,
             fontSize: 14,
             outline: 'none',
-            resize: 'vertical',
+            resize: 'none',
             fontFamily: cairo
           }}
         />
         <button
           onClick={addRequest}
-          disabled={!name.trim()}
+          disabled={!name.trim() || submitting}
           style={{
             ...styles.btnFull('linear-gradient(135deg,#10b981,#059669)', '#fff'),
-            opacity: name.trim() ? 1 : 0.5,
-            cursor: name.trim() ? 'pointer' : 'not-allowed'
+            opacity: name.trim() && !submitting ? 1 : 0.5,
+            cursor: name.trim() && !submitting ? 'pointer' : 'not-allowed'
           }}
         >
-          أضف الاسم للدعاء
+          {submitting ? '⏳ جاري الإضافة...' : '💚 أضف اسمك للدعاء'}
         </button>
       </div>
 
+      {/* زر التحديث */}
+      <button
+        onClick={refreshData}
+        style={{
+          width: '100%',
+          padding: 10,
+          borderRadius: 10,
+          border: '1px solid #d1fae5',
+          background: '#fff',
+          color: '#059669',
+          cursor: 'pointer',
+          fontWeight: 600,
+          marginBottom: 16,
+          fontSize: 13
+        }}
+      >
+        🔄 تحديث القائمة ({requests.length} اسم)
+      </button>
+
       {requests.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '30px 10px', color: '#94a3b8' }}>
-          لا توجد أسماء حتى الآن.
+          <div style={{ fontSize: 40, marginBottom: 12 }}>🤲</div>
+          <p>كن أول من يضيف اسمه للدعاء!</p>
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -1656,66 +1792,57 @@ function PrayForMe() {
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginBottom: 8 }}>
                 <div>
                   <h3 style={{ color: '#065f46', fontSize: 18, margin: '0 0 4px' }}>{item.name}</h3>
-                  <p style={{ color: '#64748b', fontSize: 12, margin: 0 }}>
-                    {new Date(item.createdAt).toLocaleDateString('ar-EG')}
+                  <p style={{ color: '#64748b', fontSize: 11, margin: 0 }}>
+                    {new Date(item.createdAt).toLocaleDateString('ar-EG')} • {item.prayed} دعوا له
                   </p>
                 </div>
-                <button
-                  onClick={() => removeRequest(item.id)}
-                  style={{
-                    width: 34,
-                    height: 34,
-                    borderRadius: 10,
-                    border: 'none',
-                    background: '#fef2f2',
-                    color: '#dc2626',
-                    cursor: 'pointer',
-                    fontWeight: 700
-                  }}
-                >
-                  ✕
-                </button>
               </div>
               {item.note && (
-                <p style={{ color: '#334155', lineHeight: 1.8, margin: '0 0 12px', fontFamily: amiri, fontSize: 18 }}>
+                <p style={{ 
+                  color: '#334155', 
+                  lineHeight: 1.8, 
+                  margin: '0 0 12px', 
+                  fontFamily: amiri, 
+                  fontSize: 17,
+                  background: '#f8fafc',
+                  padding: '8px 12px',
+                  borderRadius: 8
+                }}>
                   {item.note}
                 </p>
               )}
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button
-                  onClick={() => prayFor(item.id)}
-                  style={{
-                    flex: 1,
-                    padding: 12,
-                    borderRadius: 12,
-                    border: 'none',
-                    background: '#059669',
-                    color: '#fff',
-                    cursor: 'pointer',
-                    fontWeight: 700
-                  }}
-                >
-                  دعوت له ({item.prayed})
-                </button>
-                <button
-                  onClick={() => shareRequest(item)}
-                  style={{
-                    padding: '12px 14px',
-                    borderRadius: 12,
-                    border: 'none',
-                    background: '#f1f5f9',
-                    color: '#334155',
-                    cursor: 'pointer',
-                    fontWeight: 700
-                  }}
-                >
-                  مشاركة
-                </button>
-              </div>
+              <button
+                onClick={() => prayFor(item.id)}
+                style={{
+                  width: '100%',
+                  padding: 12,
+                  borderRadius: 12,
+                  border: 'none',
+                  background: 'linear-gradient(135deg,#059669,#047857)',
+                  color: '#fff',
+                  cursor: 'pointer',
+                  fontWeight: 700,
+                  fontSize: 15
+                }}
+              >
+                🤲 دعوت له
+              </button>
             </div>
           ))}
         </div>
       )}
+
+      <div style={{
+        marginTop: 20,
+        padding: 14,
+        background: '#fffbeb',
+        borderRadius: 12,
+        border: '1px solid #fcd34d'
+      }}>
+        <p style={{ color: '#92400e', fontSize: 12, textAlign: 'center', margin: 0, lineHeight: 1.8 }}>
+          💡 الأسماء تُحذف تلقائياً بعد 7 أيام • شارك التطبيق ليدعو لك المزيد
+        </p>
+      </div>
     </div>
   )
 }
