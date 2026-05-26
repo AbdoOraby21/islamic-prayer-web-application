@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+
 // ========== Data ==========
 const tasbeehOptions = [
   { text: 'سبحان الله', target: 33 },
@@ -9,6 +10,25 @@ const tasbeehOptions = [
   { text: 'أستغفر الله', target: 100 },
   { text: 'لا حول ولا قوة إلا بالله', target: 100 },
 ]
+
+const eidTakbeerOptions = [
+  {
+    label: 'تكبير العيد المختصر',
+    text: 'اللَّهُ أَكْبَرُ، اللَّهُ أَكْبَرُ، لَا إِلَهَ إِلَّا اللَّهُ، وَاللَّهُ أَكْبَرُ، اللَّهُ أَكْبَرُ، وَلِلَّهِ الْحَمْدُ',
+  },
+  {
+    label: 'تكبير العيد الكامل',
+    text: 'اللَّهُ أَكْبَرُ اللَّهُ أَكْبَرُ اللَّهُ أَكْبَرُ، لَا إِلَهَ إِلَّا اللَّهُ، وَاللَّهُ أَكْبَرُ اللَّهُ أَكْبَرُ، وَلِلَّهِ الْحَمْدُ، اللَّهُ أَكْبَرُ كَبِيرًا، وَالْحَمْدُ لِلَّهِ كَثِيرًا، وَسُبْحَانَ اللَّهِ بُكْرَةً وَأَصِيلًا، لَا إِلَهَ إِلَّا اللَّهُ وَحْدَهُ، صَدَقَ وَعْدَهُ، وَنَصَرَ عَبْدَهُ، وَأَعَزَّ جُنْدَهُ، وَهَزَمَ الْأَحْزَابَ وَحْدَهُ، لَا إِلَهَ إِلَّا اللَّهُ، وَلَا نَعْبُدُ إِلَّا إِيَّاهُ، مُخْلِصِينَ لَهُ الدِّينَ وَلَوْ كَرِهَ الْكَافِرُونَ، اللَّهُمَّ صَلِّ عَلَى سَيِّدِنَا مُحَمَّدٍ وَعَلَى آلِهِ وَصَحْبِهِ وَسَلِّمْ',
+  },
+]
+
+const eidDuas = [
+  { label: 'دعاء عيد الفطر', text: 'اللَّهُمَّ تَقَبَّلْ مِنَّا صِيَامَنَا وَقِيَامَنَا وَرُكُوعَنَا وَسُجُودَنَا وَتِلَاوَتَنَا، وَتَمِّمْ تَقْصِيرَنَا، يَا أَرْحَمَ الرَّاحِمِينَ' },
+  { label: 'دعاء عيد الأضحى', text: 'اللَّهُمَّ تَقَبَّلْ مِنَّا أُضْحِيَّتَنَا وَنُسُكَنَا، وَاجْعَلْهَا شَاهِدَةً لَنَا لَا عَلَيْنَا، وَبَلِّغْنَا أَعْيَادًا كَثِيرَةً وَنَحْنُ فِي طَاعَتِكَ يَا رَبَّ الْعَالَمِينَ' },
+  { label: 'دعاء التهنئة بالعيد', text: 'تَقَبَّلَ اللَّهُ مِنَّا وَمِنْكُمْ، وَكُلُّ عَامٍ وَأَنْتُمْ بِخَيْرٍ، وَجَعَلَنَا اللَّهُ وَإِيَّاكُمْ مِنَ الْعَائِدِينَ الْفَائِزِينَ' },
+  { label: 'دعاء جامع في العيد', text: 'اللَّهُمَّ اجْعَلْ هَذَا الْيَوْمَ خَيْرًا لَنَا، وَاجْعَلْ مَا بَعْدَهُ خَيْرًا مِمَّا قَبْلَهُ، وَاجْعَلْنَا مِنَ الْمَقْبُولِينَ الْمَرْحُومِينَ' },
+]
+
 const duas = [
   'رَبَّنَا آتِنَا فِي الدُّنْيَا حَسَنَةً وَفِي الْآخِرَةِ حَسَنَةً وَقِنَا عَذَابَ النَّارِ',
   'رَبِّ اشْرَحْ لِي صَدْرِي وَيَسِّرْ لِي أَمْرِي',
@@ -17,6 +37,7 @@ const duas = [
   'اللَّهُمَّ إِنِّي أَسْأَلُكَ الْعَافِيَةَ فِي الدُّنْيَا وَالْآخِرَةِ',
   'رَبَّنَا لَا تُزِغْ قُلُوبَنَا بَعْدَ إِذْ هَدَيْتَنَا',
 ]
+
 const surahNames = [
   'الفاتحة','البقرة','آل عمران','النساء','المائدة','الأنعام','الأعراف','الأنفال',
   'التوبة','يونس','هود','يوسف','الرعد','إبراهيم','الحجر','النحل',
@@ -34,6 +55,7 @@ const surahNames = [
   'الفيل','قريش','الماعون','الكوثر','الكافرون','النصر','المسد','الإخلاص',
   'الفلق','الناس',
 ]
+
 const surahAyahCount = [
   7,286,200,176,120,165,206,75,129,109,123,111,43,52,99,128,
   111,110,98,135,112,78,118,64,77,227,93,88,69,60,34,30,
@@ -43,6 +65,7 @@ const surahAyahCount = [
   29,19,36,25,22,17,19,26,30,20,15,21,11,8,8,19,
   5,8,8,11,11,8,3,9,5,4,7,3,6,3,5,4,5,6
 ]
+
 const quizQuestions = [
   { q: 'كم عدد سور القرآن الكريم؟', options: ['112','113','114','115'], correct: 2 },
   { q: 'ما هي أطول سورة في القرآن؟', options: ['آل عمران','البقرة','النساء','المائدة'], correct: 1 },
@@ -53,6 +76,7 @@ const quizQuestions = [
   { q: 'كم مرة ذُكر اسم محمد في القرآن؟', options: ['3','4','5','6'], correct: 1 },
   { q: 'ما السورة التي لا تبدأ بالبسملة؟', options: ['الأنفال','التوبة','الحجرات','محمد'], correct: 1 },
 ]
+
 // ========== Styles ==========
 const amiri = "'Amiri','Traditional Arabic',serif"
 const s = {
@@ -61,62 +85,75 @@ const s = {
   btn: (bg: string, color: string) => ({ padding: '12px 24px', borderRadius: 12, background: bg, color, border: 'none', fontWeight: 600, cursor: 'pointer', fontSize: 14, transition: 'all 0.2s' }) as React.CSSProperties,
   btnFull: (bg: string, color: string) => ({ width: '100%', padding: 16, borderRadius: 16, background: bg, color, border: 'none', fontWeight: 700, cursor: 'pointer', fontSize: 16 }) as React.CSSProperties,
 }
-// ========== Quran Reader ==========
+
+// ========== Quran Reader (Paginated, with fixed Tafseer) ==========
+const AYAHS_PER_PAGE = 10
+
 type Ayah = { number: number; numberInSurah: number; text: string }
-type TafseerItem = { ayah_number: number; text: string }
+
 function QuranReader() {
   const [surahNum, setSurahNum] = useState(1)
   const [ayahs, setAyahs] = useState<Ayah[]>([])
   const [tafseer, setTafseer] = useState<Record<number, string>>({})
   const [loading, setLoading] = useState(false)
   const [showTafseer, setShowTafseer] = useState<number | null>(null)
-  const [loadingTafseer, setLoadingTafseer] = useState(false)
+  const [loadingTafseer, setLoadingTafseer] = useState<number | null>(null)
   const [showList, setShowList] = useState(false)
   const [search, setSearch] = useState('')
   const [fontSize, setFontSize] = useState(24)
-  const scrollRef = useRef<HTMLDivElement>(null)
+  const [page, setPage] = useState(1)
+  const topRef = useRef<HTMLDivElement>(null)
+
+  const totalPages = Math.ceil(ayahs.length / AYAHS_PER_PAGE)
+  const pageAyahs = ayahs.slice((page - 1) * AYAHS_PER_PAGE, page * AYAHS_PER_PAGE)
+
   useEffect(() => {
     setLoading(true)
     setAyahs([])
     setTafseer({})
     setShowTafseer(null)
+    setPage(1)
     fetch(`https://api.alquran.cloud/v1/surah/${surahNum}`)
       .then(r => r.json())
       .then(d => { if (d.code === 200) setAyahs(d.data.ayahs); setLoading(false) })
       .catch(() => setLoading(false))
   }, [surahNum])
-  useEffect(() => { scrollRef.current?.scrollTo({ top: 0 }) }, [surahNum])
-  const loadTafseer = (num: number) => {
-    if (showTafseer === num) { setShowTafseer(null); return }
-    setShowTafseer(num)
-    if (tafseer[num]) return
-    setLoadingTafseer(true)
-    fetch(`https://api.quran-tafseer.com/tafseer/1/${surahNum}/${num}/${num}`)
-      .then(r => r.json())
-      .then(d => { if (Array.isArray(d) && d.length > 0) setTafseer(p => ({ ...p, [num]: d[0].text })); setLoadingTafseer(false) })
-      .catch(() => { setTafseer(p => ({ ...p, [num]: 'تعذر تحميل التفسير' })); setLoadingTafseer(false) })
+
+  useEffect(() => {
+    topRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [page, surahNum])
+
+  // Fix: use alquran.cloud tafseer edition (always available, no CORS issues)
+  const loadTafseer = async (ayahNumInSurah: number) => {
+    if (showTafseer === ayahNumInSurah) { setShowTafseer(null); return }
+    setShowTafseer(ayahNumInSurah)
+    if (tafseer[ayahNumInSurah]) return
+    setLoadingTafseer(ayahNumInSurah)
+    try {
+      // Calculate global ayah number
+      const prevAyahs = surahAyahCount.slice(0, surahNum - 1).reduce((a, b) => a + b, 0)
+      const globalAyah = prevAyahs + ayahNumInSurah
+      const r = await fetch(`https://api.alquran.cloud/v1/ayah/${globalAyah}/ar.muyassar`)
+      const d = await r.json()
+      if (d.code === 200 && d.data?.text) {
+        setTafseer(p => ({ ...p, [ayahNumInSurah]: d.data.text }))
+      } else {
+        setTafseer(p => ({ ...p, [ayahNumInSurah]: 'تعذر تحميل التفسير' }))
+      }
+    } catch {
+      setTafseer(p => ({ ...p, [ayahNumInSurah]: 'تعذر تحميل التفسير' }))
+    }
+    setLoadingTafseer(null)
   }
-  const loadAllTafseer = () => {
-    const total = surahAyahCount[surahNum - 1] || 7
-    setLoadingTafseer(true)
-    fetch(`https://api.quran-tafseer.com/tafseer/1/${surahNum}/1/${total}`)
-      .then(r => r.json())
-      .then(d => {
-        if (Array.isArray(d)) {
-          const t: Record<number, string> = {}
-          d.forEach((item: TafseerItem) => { t[item.ayah_number] = item.text })
-          setTafseer(t)
-        }
-        setLoadingTafseer(false)
-      })
-      .catch(() => setLoadingTafseer(false))
-  }
+
   const filtered = surahNames.filter(n => n.includes(search))
+
   return (
-    <div>
+    <div ref={topRef}>
       <div style={{ textAlign: 'center', marginBottom: 20 }}>
         <span style={s.badge('#eff6ff', '#1d4ed8')}>📖 القرآن الكريم بالتفسير</span>
       </div>
+
       {/* Surah Selector */}
       <button
         onClick={() => setShowList(!showList)}
@@ -131,6 +168,7 @@ function QuranReader() {
         </div>
         <span style={{ fontSize: 12, color: '#94a3b8' }}>{showList ? '▲' : '▼'}</span>
       </button>
+
       {showList && (
         <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #e2e8f0', boxShadow: '0 10px 30px rgba(0,0,0,0.1)', marginBottom: 12, overflow: 'hidden' }}>
           <div style={{ padding: 12, borderBottom: '1px solid #f1f5f9' }}>
@@ -158,19 +196,17 @@ function QuranReader() {
           </div>
         </div>
       )}
-      {/* Controls */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-        <button onClick={loadAllTafseer} disabled={loadingTafseer}
-          style={{ flex: 1, padding: '10px 0', background: '#fffbeb', color: '#b45309', border: 'none', borderRadius: 12, fontWeight: 600, fontSize: 13, cursor: 'pointer', opacity: loadingTafseer ? 0.5 : 1 }}>
-          {loadingTafseer ? '⏳ جاري التحميل...' : '📜 تحميل كل التفسير'}
-        </button>
+
+      {/* Font Size Control */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: '#f8fafc', borderRadius: 12, padding: 4 }}>
           <button onClick={() => setFontSize(f => Math.max(16, f - 2))} style={{ width: 30, height: 30, borderRadius: 8, background: '#fff', border: '1px solid #e2e8f0', cursor: 'pointer', fontWeight: 700 }}>-</button>
           <span style={{ fontSize: 11, color: '#64748b', width: 20, textAlign: 'center' }}>{fontSize}</span>
           <button onClick={() => setFontSize(f => Math.min(40, f + 2))} style={{ width: 30, height: 30, borderRadius: 8, background: '#fff', border: '1px solid #e2e8f0', cursor: 'pointer', fontWeight: 700 }}>+</button>
         </div>
       </div>
-      {/* Nav */}
+
+      {/* Surah Nav */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
         <button onClick={() => setSurahNum(n => Math.max(1, n - 1))} disabled={surahNum === 1}
           style={{ flex: 1, padding: 10, background: '#f1f5f9', color: '#475569', border: 'none', borderRadius: 12, fontWeight: 600, fontSize: 13, cursor: 'pointer', opacity: surahNum === 1 ? 0.3 : 1 }}>
@@ -181,22 +217,31 @@ function QuranReader() {
           السورة التالية →
         </button>
       </div>
+
       {/* Bismillah */}
       {surahNum !== 9 && (
         <div style={{ textAlign: 'center', padding: '16px 0', marginBottom: 16, background: 'linear-gradient(135deg,#eff6ff,#eef2ff,#eff6ff)', borderRadius: 16 }}>
           <p style={{ fontSize: 24, color: '#1e40af', fontFamily: amiri }}>بِسْمِ اللَّهِ الرَّحْمَنِ الرَّحِيمِ</p>
         </div>
       )}
+
       {/* Ayahs */}
-      <div ref={scrollRef} style={{ maxHeight: '55vh', overflowY: 'auto' }}>
-        {loading ? (
-          <div style={{ textAlign: 'center', padding: '60px 0' }}>
-            <div style={{ width: 40, height: 40, border: '4px solid #bfdbfe', borderTop: '4px solid #2563eb', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto 16px' }} />
-            <p style={{ color: '#64748b', fontSize: 14 }}>جاري تحميل السورة...</p>
-          </div>
-        ) : (
+      {loading ? (
+        <div style={{ textAlign: 'center', padding: '60px 0' }}>
+          <div style={{ width: 40, height: 40, border: '4px solid #bfdbfe', borderTop: '4px solid #2563eb', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto 16px' }} />
+          <p style={{ color: '#64748b', fontSize: 14 }}>جاري تحميل السورة...</p>
+        </div>
+      ) : (
+        <>
+          {/* Page indicator */}
+          {totalPages > 1 && (
+            <div style={{ textAlign: 'center', marginBottom: 12, fontSize: 13, color: '#64748b' }}>
+              صفحة {page} من {totalPages} — آيات {(page - 1) * AYAHS_PER_PAGE + 1} إلى {Math.min(page * AYAHS_PER_PAGE, ayahs.length)}
+            </div>
+          )}
+
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {ayahs.map(ayah => (
+            {pageAyahs.map(ayah => (
               <div key={ayah.number}>
                 <div style={{ background: '#f8fafc', borderRadius: 16, padding: 16 }}>
                   <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
@@ -208,29 +253,61 @@ function QuranReader() {
                   <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
                     <button
                       onClick={() => loadTafseer(ayah.numberInSurah)}
-                      style={{ padding: '6px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600, border: 'none', cursor: 'pointer', background: showTafseer === ayah.numberInSurah ? '#f59e0b' : '#fef3c7', color: showTafseer === ayah.numberInSurah ? '#fff' : '#92400e' }}>
-                      📜 {showTafseer === ayah.numberInSurah ? 'إخفاء التفسير' : 'التفسير'}
+                      style={{ padding: '6px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600, border: 'none', cursor: 'pointer',
+                        background: showTafseer === ayah.numberInSurah ? '#f59e0b' : '#fef3c7',
+                        color: showTafseer === ayah.numberInSurah ? '#fff' : '#92400e' }}>
+                      {loadingTafseer === ayah.numberInSurah ? '⏳' : '📜'} {showTafseer === ayah.numberInSurah ? 'إخفاء التفسير' : 'التفسير الميسر'}
                     </button>
                   </div>
                 </div>
                 {showTafseer === ayah.numberInSurah && (
                   <div style={{ marginRight: 24, marginTop: 8, background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: 12, padding: 16 }}>
                     <div style={{ fontWeight: 700, fontSize: 13, color: '#b45309', marginBottom: 8 }}>📜 التفسير الميسر</div>
-                    {loadingTafseer && !tafseer[ayah.numberInSurah] ? (
+                    {loadingTafseer === ayah.numberInSurah ? (
                       <p style={{ color: '#64748b', fontSize: 13 }}>⏳ جاري تحميل التفسير...</p>
                     ) : (
-                      <p style={{ color: '#374151', fontSize: 14, lineHeight: 1.8 }}>{tafseer[ayah.numberInSurah] || 'جاري التحميل...'}</p>
+                      <p style={{ color: '#374151', fontSize: 14, lineHeight: 1.8, fontFamily: amiri }}>{tafseer[ayah.numberInSurah] || 'تعذر تحميل التفسير'}</p>
                     )}
                   </div>
                 )}
               </div>
             ))}
           </div>
-        )}
-      </div>
+
+          {/* Pagination Controls */}
+          {totalPages > 1 && (
+            <div style={{ marginTop: 20 }}>
+              {/* Page numbers */}
+              <div style={{ display: 'flex', gap: 6, justifyContent: 'center', flexWrap: 'wrap', marginBottom: 12 }}>
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
+                  <button key={p} onClick={() => setPage(p)}
+                    style={{ width: 36, height: 36, borderRadius: 10, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 13,
+                      background: page === p ? '#2563eb' : '#f1f5f9',
+                      color: page === p ? '#fff' : '#475569',
+                      boxShadow: page === p ? '0 2px 8px rgba(37,99,235,0.3)' : 'none' }}>
+                    {p}
+                  </button>
+                ))}
+              </div>
+              {/* Prev / Next */}
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
+                  style={{ flex: 1, padding: 10, background: '#eff6ff', color: '#2563eb', border: 'none', borderRadius: 12, fontWeight: 600, fontSize: 13, cursor: 'pointer', opacity: page === 1 ? 0.3 : 1 }}>
+                  ← الصفحة السابقة
+                </button>
+                <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
+                  style={{ flex: 1, padding: 10, background: '#eff6ff', color: '#2563eb', border: 'none', borderRadius: 12, fontWeight: 600, fontSize: 13, cursor: 'pointer', opacity: page === totalPages ? 0.3 : 1 }}>
+                  الصفحة التالية →
+                </button>
+              </div>
+            </div>
+          )}
+        </>
+      )}
     </div>
   )
 }
+
 // ========== Tasbeeh ==========
 function Tasbeeh() {
   const [sel, setSel] = useState(0)
@@ -269,18 +346,23 @@ function Tasbeeh() {
             strokeLinecap="round" strokeDasharray={circ} strokeDashoffset={circ * (1 - pct / 100)}
             style={{ transition: 'stroke-dashoffset 0.3s' }} />
         </svg>
-        <button onClick={click}
-          style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: 160, height: 160, borderRadius: '50%',
-            background: count >= cur.target ? 'linear-gradient(135deg,#f59e0b,#d97706)' : 'linear-gradient(135deg,#10b981,#047857)',
-            color: '#fff', border: 'none', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 8px 30px rgba(16,185,129,0.3)' }}>
-          <span style={{ fontSize: 44, fontWeight: 700 }}>{count}</span>
-          <span style={{ fontSize: 13, opacity: 0.8 }}>/ {cur.target}</span>
-        </button>
+        <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ fontFamily: amiri, fontSize: 22, fontWeight: 700, color: '#047857', marginBottom: 4 }}>{cur.text}</div>
+          <div style={{ fontSize: 48, fontWeight: 700, color: '#1e293b', lineHeight: 1 }}>{count}</div>
+          <div style={{ fontSize: 14, color: '#94a3b8', marginTop: 4 }}>من {cur.target}</div>
+        </div>
       </div>
-      <h2 style={{ fontSize: 26, fontWeight: 700, color: '#065f46', marginBottom: 8, fontFamily: amiri }}>{cur.text}</h2>
-      <p style={{ color: '#6b7280', fontSize: 14, marginBottom: 20 }}>إجمالي التسبيحات: {total}</p>
-      <button onClick={() => setCount(0)} style={s.btn('#fef2f2', '#dc2626')}>🔄 إعادة</button>
+      <button onClick={click}
+        style={{ width: 120, height: 120, borderRadius: '50%', background: 'linear-gradient(135deg,#34d399,#059669)', color: '#fff', border: 'none', fontSize: 32, cursor: 'pointer', boxShadow: '0 8px 24px rgba(5,150,105,0.4)', marginBottom: 20, transition: 'transform 0.1s', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
+        📿
+      </button>
+      <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginBottom: 16 }}>
+        <button onClick={() => setCount(0)} style={s.btn('#f1f5f9', '#374151')}>إعادة</button>
+        <div style={{ background: '#f8fafc', borderRadius: 12, padding: '10px 20px' }}>
+          <div style={{ fontSize: 11, color: '#64748b' }}>الإجمالي</div>
+          <div style={{ fontWeight: 700, color: '#059669', fontSize: 18 }}>{total}</div>
+        </div>
+      </div>
       {done && (
         <div style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.5)', zIndex: 50 }}>
           <div style={{ background: '#fff', borderRadius: 20, padding: 32, textAlign: 'center' }}>
@@ -293,6 +375,94 @@ function Tasbeeh() {
     </div>
   )
 }
+
+// ========== Eid Takbeer ==========
+function EidTakbeer() {
+  const [selectedTakbeer, setSelectedTakbeer] = useState(0)
+  const [count, setCount] = useState(0)
+  const [copied, setCopied] = useState(false)
+  const [selectedDua, setSelectedDua] = useState(0)
+  const [duaCopied, setDuaCopied] = useState(false)
+
+  const copyText = (text: string, setter: (v: boolean) => void) => {
+    navigator.clipboard.writeText(text).then(() => {
+      setter(true)
+      setTimeout(() => setter(false), 2000)
+    })
+  }
+
+  return (
+    <div>
+      <div style={{ textAlign: 'center', marginBottom: 20 }}>
+        <span style={s.badge('#fff7ed', '#c2410c')}>🌙 تكبيرات العيد</span>
+      </div>
+
+      {/* Eid type selector */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
+        {eidTakbeerOptions.map((opt, i) => (
+          <button key={i} onClick={() => { setSelectedTakbeer(i); setCount(0) }}
+            style={{ flex: 1, padding: '10px 0', borderRadius: 12, border: 'none', fontWeight: 600, fontSize: 12, cursor: 'pointer',
+              background: selectedTakbeer === i ? 'linear-gradient(135deg,#f97316,#dc2626)' : '#f1f5f9',
+              color: selectedTakbeer === i ? '#fff' : '#374151' }}>
+            {opt.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Takbeer Text */}
+      <div style={{ background: 'linear-gradient(135deg,#fff7ed,#fef3c7)', border: '2px solid #fed7aa', borderRadius: 16, padding: 20, marginBottom: 16 }}>
+        <p style={{ fontFamily: amiri, fontSize: 22, color: '#7c2d12', lineHeight: 2.2, textAlign: 'center', margin: 0 }}>
+          {eidTakbeerOptions[selectedTakbeer].text}
+        </p>
+      </div>
+
+      {/* Copy button */}
+      <button onClick={() => copyText(eidTakbeerOptions[selectedTakbeer].text, setCopied)}
+        style={{ ...s.btnFull(copied ? '#059669' : '#f1f5f9', copied ? '#fff' : '#374151'), marginBottom: 20 }}>
+        {copied ? '✅ تم النسخ!' : '📋 نسخ التكبير'}
+      </button>
+
+      {/* Counter */}
+      <div style={{ background: 'linear-gradient(135deg,#fef2f2,#fff7ed)', borderRadius: 16, padding: 20, textAlign: 'center', marginBottom: 20 }}>
+        <div style={{ fontSize: 13, color: '#92400e', marginBottom: 8, fontWeight: 600 }}>عداد التكبير</div>
+        <div style={{ fontSize: 56, fontWeight: 700, color: '#c2410c', marginBottom: 12, lineHeight: 1 }}>{count}</div>
+        <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+          <button onClick={() => setCount(c => c + 1)}
+            style={{ width: 64, height: 64, borderRadius: '50%', background: 'linear-gradient(135deg,#f97316,#dc2626)', color: '#fff', border: 'none', fontSize: 28, cursor: 'pointer', boxShadow: '0 4px 16px rgba(220,38,38,0.35)' }}>
+            🌙
+          </button>
+          <button onClick={() => setCount(0)}
+            style={{ padding: '0 20px', borderRadius: 12, background: '#f1f5f9', color: '#374151', border: 'none', fontWeight: 600, cursor: 'pointer', fontSize: 13 }}>
+            إعادة
+          </button>
+        </div>
+      </div>
+
+      {/* Eid Duas */}
+      <div style={{ background: 'linear-gradient(135deg,#ecfdf5,#d1fae5)', borderRadius: 16, padding: 20, border: '1px solid #6ee7b7' }}>
+        <div style={{ fontWeight: 700, fontSize: 14, color: '#065f46', marginBottom: 12 }}>🤲 أدعية العيد</div>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
+          {eidDuas.map((d, i) => (
+            <button key={i} onClick={() => setSelectedDua(i)}
+              style={{ padding: '6px 12px', borderRadius: 999, fontSize: 12, fontWeight: 600, border: 'none', cursor: 'pointer',
+                background: selectedDua === i ? '#059669' : '#f0fdf4', color: selectedDua === i ? '#fff' : '#047857' }}>
+              {d.label}
+            </button>
+          ))}
+        </div>
+        <p style={{ fontFamily: amiri, fontSize: 18, color: '#065f46', lineHeight: 2, marginBottom: 12 }}>
+          {eidDuas[selectedDua].text}
+        </p>
+        <button onClick={() => copyText(eidDuas[selectedDua].text, setDuaCopied)}
+          style={{ padding: '8px 16px', borderRadius: 10, border: 'none', fontWeight: 600, fontSize: 13, cursor: 'pointer',
+            background: duaCopied ? '#059669' : '#dcfce7', color: duaCopied ? '#fff' : '#065f46' }}>
+          {duaCopied ? '✅ تم النسخ!' : '📋 نسخ الدعاء'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 // ========== Khatma ==========
 function Khatma() {
   const [view, setView] = useState<'juz' | 'surah'>('juz')
@@ -358,6 +528,7 @@ function Khatma() {
     </div>
   )
 }
+
 // ========== Quiz ==========
 function Quiz() {
   const [st, setSt] = useState<'idle' | 'play' | 'end'>('idle')
@@ -459,6 +630,7 @@ function Quiz() {
     </div>
   )
 }
+
 // ========== Dua Slider ==========
 function DuaSlider() {
   const [cur, setCur] = useState(0)
@@ -483,14 +655,17 @@ function DuaSlider() {
     </div>
   )
 }
+
 // ========== Main App ==========
-type Tab = 'tasbeeh' | 'quran' | 'khatma' | 'quiz'
+type Tab = 'tasbeeh' | 'quran' | 'khatma' | 'quiz' | 'eid'
 const tabConfig: { id: Tab; label: string; icon: string; bg: string }[] = [
   { id: 'tasbeeh', label: 'المسبحة', icon: '📿', bg: '#059669' },
   { id: 'quran', label: 'القرآن', icon: '📖', bg: '#2563eb' },
   { id: 'khatma', label: 'الختمة', icon: '✅', bg: '#d97706' },
-  { id: 'quiz', label: 'المسابقة', icon: '🧠', bg: '#7c3aed' },
+  { id: 'quiz', label: 'مسابقة', icon: '🧠', bg: '#7c3aed' },
+  { id: 'eid', label: 'العيد', icon: '🌙', bg: '#dc2626' },
 ]
+
 export default function App() {
   const [tab, setTab] = useState<Tab>('tasbeeh')
   return (
@@ -511,9 +686,9 @@ export default function App() {
         <div style={{ display: 'flex', background: '#fff', borderRadius: 16, padding: 6, marginBottom: 24, boxShadow: '0 2px 8px rgba(0,0,0,0.04)', gap: 4 }}>
           {tabConfig.map(t => (
             <button key={t.id} onClick={() => setTab(t.id)}
-              style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2, padding: '10px 0', borderRadius: 12, border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: 12,
+              style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2, padding: '10px 0', borderRadius: 12, border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: 11,
                 background: tab === t.id ? t.bg : 'transparent', color: tab === t.id ? '#fff' : '#6b7280', boxShadow: tab === t.id ? '0 4px 12px rgba(0,0,0,0.15)' : 'none', transition: 'all 0.2s' }}>
-              <span style={{ fontSize: 18 }}>{t.icon}</span>
+              <span style={{ fontSize: 16 }}>{t.icon}</span>
               <span>{t.label}</span>
             </button>
           ))}
@@ -524,6 +699,7 @@ export default function App() {
           {tab === 'quran' && <QuranReader />}
           {tab === 'khatma' && <Khatma />}
           {tab === 'quiz' && <Quiz />}
+          {tab === 'eid' && <EidTakbeer />}
         </div>
         {/* Footer */}
         <footer style={{ textAlign: 'center', marginTop: 32, paddingBottom: 32 }}>
