@@ -86,6 +86,22 @@ const surahAyahCount = [
   5,8,8,11,11,8,3,9,5,4,7,3,6,3,5,4,5,6
 ]
 
+// قائمة القراء المتاحين
+const reciters = [
+  { id: 'ar.alafasy', name: 'مشاري العفاسي', server: 'alafasy' },
+  { id: 'ar.abdulbasitmurattal', name: 'عبد الباسط عبد الصمد (مرتل)', server: 'abdulbasit_murattal' },
+  { id: 'ar.abdulsamad', name: 'عبد الباسط عبد الصمد (مجود)', server: 'abdulbasit_mujawwad' },
+  { id: 'ar.husary', name: 'محمود خليل الحصري', server: 'husary' },
+  { id: 'ar.minshawi', name: 'محمد صديق المنشاوي', server: 'minshawi' },
+  { id: 'ar.minshawimujawwad', name: 'المنشاوي (مجود)', server: 'minshawi_mujawwad' },
+  { id: 'ar.ahmedajamy', name: 'أحمد العجمي', server: 'ajamy' },
+  { id: 'ar.sudais', name: 'عبد الرحمن السديس', server: 'sudais' },
+  { id: 'ar.shuraym', name: 'سعود الشريم', server: 'shuraym' },
+  { id: 'ar.maaborheal', name: 'ماهر المعيقلي', server: 'maher' },
+  { id: 'ar.haborheel', name: 'محمد أيوب', server: 'ayyub' },
+  { id: 'ar.parhizgar', name: 'ياسر الدوسري', server: 'yasser' },
+]
+
 const quizQuestions = [
   { q: 'كم عدد سور القرآن الكريم؟', options: ['112','113','114','115'], correct: 2 },
   { q: 'ما هي أطول سورة في القرآن؟', options: ['آل عمران','البقرة','النساء','المائدة'], correct: 1 },
@@ -157,6 +173,258 @@ function speakArabic(text: string) {
   window.speechSynthesis.speak(utter)
 }
 
+// ========== Audio Player Component ==========
+function AudioPlayer({ 
+  surahNum, 
+  reciterId, 
+  onReciterChange 
+}: { 
+  surahNum: number
+  reciterId: string
+  onReciterChange: (id: string) => void 
+}) {
+  const [isPlaying, setIsPlaying] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+  const [progress, setProgress] = useState(0)
+  const [duration, setDuration] = useState(0)
+  const [currentTime, setCurrentTime] = useState(0)
+  const [showReciters, setShowReciters] = useState(false)
+  const audioRef = useRef<HTMLAudioElement | null>(null)
+
+  const reciter = reciters.find(r => r.id === reciterId) || reciters[0]
+  
+  // بناء رابط الصوت
+  const getAudioUrl = () => {
+    const surahStr = surahNum.toString().padStart(3, '0')
+    return `https://cdn.islamic.network/quran/audio-surah/128/${reciter.server}/${surahStr}.mp3`
+  }
+
+  useEffect(() => {
+    // إيقاف الصوت عند تغيير السورة أو القارئ
+    if (audioRef.current) {
+      audioRef.current.pause()
+      audioRef.current.currentTime = 0
+      setIsPlaying(false)
+      setProgress(0)
+      setCurrentTime(0)
+    }
+  }, [surahNum, reciterId])
+
+  const togglePlay = async () => {
+    if (!audioRef.current) {
+      audioRef.current = new Audio(getAudioUrl())
+      
+      audioRef.current.addEventListener('loadstart', () => setIsLoading(true))
+      audioRef.current.addEventListener('canplay', () => setIsLoading(false))
+      audioRef.current.addEventListener('loadedmetadata', () => {
+        setDuration(audioRef.current?.duration || 0)
+      })
+      audioRef.current.addEventListener('timeupdate', () => {
+        const audio = audioRef.current
+        if (audio) {
+          setCurrentTime(audio.currentTime)
+          setProgress((audio.currentTime / audio.duration) * 100)
+        }
+      })
+      audioRef.current.addEventListener('ended', () => {
+        setIsPlaying(false)
+        setProgress(0)
+        setCurrentTime(0)
+      })
+      audioRef.current.addEventListener('error', () => {
+        setIsLoading(false)
+        setIsPlaying(false)
+        alert('تعذر تحميل الملف الصوتي')
+      })
+    }
+
+    if (isPlaying) {
+      audioRef.current.pause()
+      setIsPlaying(false)
+    } else {
+      setIsLoading(true)
+      try {
+        await audioRef.current.play()
+        setIsPlaying(true)
+      } catch (err) {
+        console.error('Error playing audio:', err)
+      }
+      setIsLoading(false)
+    }
+  }
+
+  const handleSeek = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!audioRef.current || !duration) return
+    const rect = e.currentTarget.getBoundingClientRect()
+    const x = e.clientX - rect.left
+    const percentage = x / rect.width
+    audioRef.current.currentTime = percentage * duration
+  }
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60)
+    const secs = Math.floor(seconds % 60)
+    return `${mins}:${secs.toString().padStart(2, '0')}`
+  }
+
+  const handleReciterChange = (id: string) => {
+    if (audioRef.current) {
+      audioRef.current.pause()
+      audioRef.current = null
+    }
+    setIsPlaying(false)
+    setProgress(0)
+    setCurrentTime(0)
+    setDuration(0)
+    onReciterChange(id)
+    setShowReciters(false)
+  }
+
+  return (
+    <div style={{ 
+      background: 'linear-gradient(135deg, #1e40af, #3b82f6)', 
+      borderRadius: 16, 
+      padding: 16, 
+      marginBottom: 16 
+    }}>
+      {/* اختيار القارئ */}
+      <div style={{ marginBottom: 12 }}>
+        <button
+          onClick={() => setShowReciters(!showReciters)}
+          style={{
+            width: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '10px 14px',
+            background: 'rgba(255,255,255,0.15)',
+            border: 'none',
+            borderRadius: 10,
+            cursor: 'pointer',
+            color: '#fff'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span>🎙️</span>
+            <span style={{ fontWeight: 600, fontSize: 14 }}>{reciter.name}</span>
+          </div>
+          <span style={{ fontSize: 10 }}>{showReciters ? '▲' : '▼'}</span>
+        </button>
+        
+        {showReciters && (
+          <div style={{ 
+            marginTop: 8, 
+            background: '#fff', 
+            borderRadius: 12, 
+            maxHeight: 200, 
+            overflowY: 'auto',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
+          }}>
+            {reciters.map(r => (
+              <button
+                key={r.id}
+                onClick={() => handleReciterChange(r.id)}
+                style={{
+                  width: '100%',
+                  padding: '12px 16px',
+                  border: 'none',
+                  borderBottom: '1px solid #f1f5f9',
+                  background: reciterId === r.id ? '#eff6ff' : '#fff',
+                  cursor: 'pointer',
+                  textAlign: 'right',
+                  fontSize: 14,
+                  fontWeight: reciterId === r.id ? 600 : 400,
+                  color: reciterId === r.id ? '#1d4ed8' : '#374151',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8
+                }}
+              >
+                {reciterId === r.id && <span>✓</span>}
+                <span>{r.name}</span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* شريط التقدم */}
+      <div 
+        onClick={handleSeek}
+        style={{ 
+          height: 6, 
+          background: 'rgba(255,255,255,0.3)', 
+          borderRadius: 999, 
+          marginBottom: 12,
+          cursor: 'pointer',
+          overflow: 'hidden'
+        }}
+      >
+        <div style={{ 
+          height: '100%', 
+          background: '#fff', 
+          borderRadius: 999,
+          width: `${progress}%`,
+          transition: 'width 0.1s'
+        }} />
+      </div>
+
+      {/* الوقت والأزرار */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <span style={{ color: 'rgba(255,255,255,0.8)', fontSize: 12 }}>
+          {formatTime(currentTime)}
+        </span>
+        
+        <button
+          onClick={togglePlay}
+          disabled={isLoading}
+          style={{
+            width: 56,
+            height: 56,
+            borderRadius: '50%',
+            background: '#fff',
+            border: 'none',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: 24,
+            boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+            opacity: isLoading ? 0.7 : 1
+          }}
+        >
+          {isLoading ? (
+            <div style={{
+              width: 24,
+              height: 24,
+              border: '3px solid #e5e7eb',
+              borderTop: '3px solid #3b82f6',
+              borderRadius: '50%',
+              animation: 'spin 1s linear infinite'
+            }} />
+          ) : isPlaying ? '⏸️' : '▶️'}
+        </button>
+        
+        <span style={{ color: 'rgba(255,255,255,0.8)', fontSize: 12 }}>
+          {duration ? formatTime(duration) : '--:--'}
+        </span>
+      </div>
+
+      {/* اسم السورة */}
+      <div style={{ textAlign: 'center', marginTop: 12 }}>
+        <span style={{ 
+          color: '#fff', 
+          fontSize: 16, 
+          fontWeight: 700,
+          fontFamily: amiri
+        }}>
+          سورة {surahNames[surahNum - 1]}
+        </span>
+      </div>
+    </div>
+  )
+}
+
 // ========== Quran Reader — by PAGE (Mushaf) ==========
 const TOTAL_PAGES = 604
 
@@ -175,6 +443,7 @@ type AyahData = {
 
 function QuranReader() {
   const [mode, setMode] = useState<'page' | 'surah'>('page')
+  const [selectedReciter, setSelectedReciter] = useState(reciters[0].id)
 
   // --- Page mode state ---
   const [pageNum, setPageNum] = useState(1)
@@ -196,6 +465,8 @@ function QuranReader() {
   const [showTafseer, setShowTafseer] = useState<number | null>(null)
   const [loadingTafseer, setLoadingTafseer] = useState<number | null>(null)
   const [fontSize, setFontSize] = useState(24)
+  const [playingAyah, setPlayingAyah] = useState<number | null>(null)
+  const ayahAudioRef = useRef<HTMLAudioElement | null>(null)
   const topRef = useRef<HTMLDivElement>(null)
 
   // Fetch page
@@ -235,6 +506,14 @@ function QuranReader() {
     topRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }, [pageNum, surahNum, surahPage, mode])
 
+  // إيقاف الصوت عند تغيير الصفحة
+  useEffect(() => {
+    if (ayahAudioRef.current) {
+      ayahAudioRef.current.pause()
+      setPlayingAyah(null)
+    }
+  }, [pageNum, surahNum, surahPage])
+
   const loadTafseer = async (globalAyahNum: number) => {
     const key = globalAyahNum
     if (showTafseer === key) { setShowTafseer(null); return }
@@ -253,6 +532,38 @@ function QuranReader() {
       setTafseer(p => ({ ...p, [key]: 'تعذر تحميل التفسير' }))
     }
     setLoadingTafseer(null)
+  }
+
+  // تشغيل صوت آية معينة
+  const playAyahAudio = async (ayahNumber: number) => {
+    // إيقاف الصوت الحالي
+    if (ayahAudioRef.current) {
+      ayahAudioRef.current.pause()
+    }
+
+    if (playingAyah === ayahNumber) {
+      setPlayingAyah(null)
+      return
+    }
+
+    const reciter = reciters.find(r => r.id === selectedReciter) || reciters[0]
+    const audioUrl = `https://cdn.islamic.network/quran/audio/128/${reciter.server}/${ayahNumber}.mp3`
+    
+    ayahAudioRef.current = new Audio(audioUrl)
+    setPlayingAyah(ayahNumber)
+    
+    ayahAudioRef.current.onended = () => setPlayingAyah(null)
+    ayahAudioRef.current.onerror = () => {
+      setPlayingAyah(null)
+      alert('تعذر تحميل صوت الآية')
+    }
+    
+    try {
+      await ayahAudioRef.current.play()
+    } catch (err) {
+      console.error('Error playing ayah:', err)
+      setPlayingAyah(null)
+    }
   }
 
   // Group page ayahs by surah
@@ -301,9 +612,9 @@ function QuranReader() {
             {ayah.text}
           </p>
         </div>
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8 }}>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
           <button
-            onClick={() => speakArabic(ayah.text)}
+            onClick={() => playAyahAudio(globalNum)}
             style={{ 
               padding: '6px 12px', 
               borderRadius: 8, 
@@ -311,10 +622,11 @@ function QuranReader() {
               fontWeight: 600, 
               border: 'none', 
               cursor: 'pointer', 
-              background: '#eff6ff', 
-              color: '#2563eb' 
+              background: playingAyah === globalNum ? '#2563eb' : '#eff6ff', 
+              color: playingAyah === globalNum ? '#fff' : '#2563eb',
+              transition: 'all 0.2s'
             }}>
-            🔊 استماع
+            {playingAyah === globalNum ? '⏹ إيقاف' : '🔊 استماع'}
           </button>
           <button
             onClick={() => loadTafseer(globalNum)}
@@ -362,6 +674,14 @@ function QuranReader() {
     }
   }
 
+  // الحصول على رقم السورة الحالية في وضع الصفحة
+  const getCurrentSurahInPage = () => {
+    if (groupedBySurah.length > 0) {
+      return groupedBySurah[0].surahNum
+    }
+    return 1
+  }
+
   return (
     <div ref={topRef}>
       <div style={{ textAlign: 'center', marginBottom: 20 }}>
@@ -388,8 +708,37 @@ function QuranReader() {
         ))}
       </div>
 
+      {/* مشغل الصوت للسورة كاملة */}
+      {mode === 'surah' && (
+        <AudioPlayer 
+          surahNum={surahNum} 
+          reciterId={selectedReciter}
+          onReciterChange={setSelectedReciter}
+        />
+      )}
+
       {/* Font size */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 12, color: '#64748b' }}>القارئ:</span>
+          <select
+            value={selectedReciter}
+            onChange={(e) => setSelectedReciter(e.target.value)}
+            style={{
+              padding: '6px 10px',
+              borderRadius: 8,
+              border: '1px solid #e2e8f0',
+              background: '#f8fafc',
+              fontSize: 12,
+              color: '#374151',
+              cursor: 'pointer'
+            }}
+          >
+            {reciters.map(r => (
+              <option key={r.id} value={r.id}>{r.name}</option>
+            ))}
+          </select>
+        </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: '#f8fafc', borderRadius: 12, padding: 4 }}>
           <button 
             onClick={() => setFontSize(f => Math.max(16, f - 2))} 
@@ -424,6 +773,15 @@ function QuranReader() {
       {/* ===== PAGE MODE ===== */}
       {mode === 'page' && (
         <>
+          {/* مشغل صوت السورة في وضع الصفحة */}
+          {!loadingPage && groupedBySurah.length > 0 && (
+            <AudioPlayer 
+              surahNum={getCurrentSurahInPage()} 
+              reciterId={selectedReciter}
+              onReciterChange={setSelectedReciter}
+            />
+          )}
+
           {/* Page number input */}
           <div style={{ display: 'flex', gap: 8, marginBottom: 12, alignItems: 'center' }}>
             <button 
@@ -1045,7 +1403,6 @@ function EidTakbeer() {
       setter(true)
       setTimeout(() => setter(false), 2000)
     }).catch(() => {
-      // Fallback for older browsers
       const textArea = document.createElement('textarea')
       textArea.value = text
       document.body.appendChild(textArea)
@@ -1107,7 +1464,6 @@ function EidTakbeer() {
     speakOnce()
   }
 
-  // Stop audio when switching takbeer
   const selectTakbeer = (i: number) => {
     window.speechSynthesis.cancel()
     setSpeaking(false)
@@ -1125,7 +1481,6 @@ function EidTakbeer() {
         <span style={styles.badge('#fff7ed', '#c2410c')}>🌙 تكبيرات العيد</span>
       </div>
 
-      {/* Takbeer type selector */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 20 }}>
         {eidTakbeerOptions.map((opt, i) => (
           <button 
@@ -1147,7 +1502,6 @@ function EidTakbeer() {
         ))}
       </div>
 
-      {/* Takbeer Text */}
       <div style={{ 
         background: opt.bg, 
         border: `2px solid ${opt.border}`, 
@@ -1167,7 +1521,6 @@ function EidTakbeer() {
         </p>
       </div>
 
-      {/* Audio controls */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 16 }}>
         <button 
           onClick={handleSpeak}
@@ -1216,7 +1569,6 @@ function EidTakbeer() {
         </button>
       </div>
 
-      {/* Note about speech */}
       <div style={{ 
         background: '#f0fdf4', 
         borderRadius: 10, 
@@ -1229,7 +1581,6 @@ function EidTakbeer() {
         💡 الصوت يعتمد على محرك النص الموجود في جهازك — قد يختلف الصوت من جهاز لآخر
       </div>
 
-      {/* Counter */}
       <div style={{ 
         background: opt.bg, 
         border: `1px solid ${opt.border}`, 
@@ -1276,7 +1627,6 @@ function EidTakbeer() {
         </div>
       </div>
 
-      {/* Eid Duas */}
       <div style={{ 
         background: 'linear-gradient(135deg,#ecfdf5,#d1fae5)', 
         borderRadius: 16, 
@@ -1785,7 +2135,6 @@ const tabConfig: { id: Tab; label: string; icon: string; bg: string }[] = [
 export default function App() {
   const [tab, setTab] = useState<Tab>('tasbeeh')
 
-  // Load voices for speech synthesis
   useEffect(() => {
     if (window.speechSynthesis) {
       window.speechSynthesis.getVoices()
