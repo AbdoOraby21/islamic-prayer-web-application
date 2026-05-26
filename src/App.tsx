@@ -1519,9 +1519,8 @@ function Quiz() {
 }
 
 // ========== Pray For Me ==========
-// نستخدم JSONBin API المجاني لتخزين الأسماء بشكل مشترك
-const JSONBIN_API = 'https://jsonbin-zeta.vercel.app/api/bins'
-const BIN_ID_KEY = 'thikr_prayer_bin_id'
+// jsonblob.com - مجاني + بدون تسجيل + CORS مفعّل
+const BLOB_API = 'https://jsonblob.com/api/jsonBlob'
 
 type PrayerRequest = {
   id: string
@@ -1535,211 +1534,383 @@ function PrayForMe() {
   const [name, setName] = useState('')
   const [note, setNote] = useState('')
   const [requests, setRequests] = useState<PrayerRequest[]>([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
-  const [binId, setBinId] = useState<string | null>(() => {
-    try { return localStorage.getItem(BIN_ID_KEY) } catch { return null }
-  })
+  const [roomId, setRoomId] = useState('')
+  const [joinCode, setJoinCode] = useState('')
+  const [screen, setScreen] = useState<'menu' | 'room'>('menu')
   const [error, setError] = useState('')
+  const [copied, setCopied] = useState(false)
+  const [prayedIds, setPrayedIds] = useState<Set<string>>(() => {
+    try {
+      return new Set(JSON.parse(localStorage.getItem('thikr_prayed') || '[]'))
+    } catch { return new Set() }
+  })
 
-  // جلب البيانات من السيرفر
+  // حفظ الـ IDs اللي دعيت لهم
+  useEffect(() => {
+    try { localStorage.setItem('thikr_prayed', JSON.stringify([...prayedIds])) } catch {}
+  }, [prayedIds])
+
+  // فتح غرفة من الـ URL لو موجودة
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const rid = params.get('room')
+    if (rid) {
+      joinRoom(rid)
+    }
+  }, [])
+
+  // جلب البيانات
   const fetchRequests = async (id: string) => {
     try {
-      const r = await fetch(`${JSONBIN_API}/${id}`)
+      const r = await fetch(`${BLOB_API}/${id}`, {
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }
+      })
       if (!r.ok) throw new Error('Not found')
       const data = await r.json()
-      const items = Array.isArray(data.requests) ? data.requests : []
-      // ترتيب من الأحدث للأقدم وحذف القديم (أكثر من 7 أيام)
+      const items: PrayerRequest[] = Array.isArray(data.requests) ? data.requests : []
       const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000
       const filtered = items
-        .filter((item: PrayerRequest) => new Date(item.createdAt).getTime() > weekAgo)
-        .sort((a: PrayerRequest, b: PrayerRequest) => 
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-        )
-        .slice(0, 50) // أقصى 50 اسم
+        .filter(item => new Date(item.createdAt).getTime() > weekAgo)
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        .slice(0, 100)
       setRequests(filtered)
       setError('')
     } catch {
       setRequests([])
+      setError('تعذر تحميل البيانات')
     }
   }
 
-  // حفظ البيانات للسيرفر
+  // حفظ البيانات
   const saveRequests = async (id: string, items: PrayerRequest[]) => {
     try {
-      await fetch(`${JSONBIN_API}/${id}`, {
+      await fetch(`${BLOB_API}/${id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
         body: JSON.stringify({ requests: items })
       })
     } catch {
-      // ignore
+      setError('تعذر حفظ البيانات')
     }
   }
 
-  // إنشاء bin جديد أو جلب الموجود
-  useEffect(() => {
-    const init = async () => {
-      setLoading(true)
-      
-      // نستخدم bin واحد ثابت لكل المستخدمين
-      // نخزن الـ ID في localStorage أول مرة ثم نستخدمه
-      const sharedBinId = 'thikr-shared-prayers-v1'
-      
-      try {
-        // محاولة جلب البيانات من bin موجود
-        const r = await fetch(`${JSONBIN_API}/${sharedBinId}`)
-        if (r.ok) {
-          setBinId(sharedBinId)
-          await fetchRequests(sharedBinId)
-        } else {
-          // إنشاء bin جديد
-          const createRes = await fetch(JSONBIN_API, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ requests: [], id: sharedBinId })
-          })
-          if (createRes.ok) {
-            const data = await createRes.json()
-            const newId = data.id || sharedBinId
-            setBinId(newId)
-            try { localStorage.setItem(BIN_ID_KEY, newId) } catch {}
-          }
-        }
-      } catch {
-        setError('تعذر الاتصال بالسيرفر')
-      }
-      
-      setLoading(false)
+  // إنشاء غرفة جديدة
+  const createRoom = async () => {
+    setLoading(true)
+    setError('')
+    try {
+      const r = await fetch(BLOB_API, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify({ requests: [] })
+      })
+      if (!r.ok) throw new Error('Failed')
+      // jsonblob يرجع الـ ID في الـ Location header
+      const loc = r.headers.get('Location') || ''
+      const id = loc.split('/').pop() || ''
+      if (!id) throw new Error('No ID')
+      setRoomId(id)
+      setRequests([])
+      setScreen('room')
+      try { localStorage.setItem('thikr_room', id) } catch {}
+    } catch {
+      setError('تعذر إنشاء الغرفة. حاول مرة أخرى.')
     }
-    
-    init()
-  }, [])
+    setLoading(false)
+  }
 
-  // تحديث البيانات كل 30 ثانية
+  // الانضمام لغرفة موجودة
+  const joinRoom = async (id: string) => {
+    const cleanId = id.trim()
+    if (!cleanId) return
+    setLoading(true)
+    setError('')
+    try {
+      const r = await fetch(`${BLOB_API}/${cleanId}`, {
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }
+      })
+      if (!r.ok) throw new Error('Not found')
+      const data = await r.json()
+      if (typeof data !== 'object') throw new Error('Invalid')
+      setRoomId(cleanId)
+      const items: PrayerRequest[] = Array.isArray(data.requests) ? data.requests : []
+      setRequests(items.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()))
+      setScreen('room')
+      try { localStorage.setItem('thikr_room', cleanId) } catch {}
+    } catch {
+      setError('لم يتم العثور على الغرفة. تأكد من الكود.')
+    }
+    setLoading(false)
+  }
+
+  // تحديث تلقائي كل 15 ثانية
   useEffect(() => {
-    if (!binId) return
-    const interval = setInterval(() => fetchRequests(binId), 30000)
+    if (screen !== 'room' || !roomId) return
+    const interval = setInterval(() => fetchRequests(roomId), 15000)
     return () => clearInterval(interval)
-  }, [binId])
+  }, [screen, roomId])
 
+  // إضافة اسم
   const addRequest = async () => {
     const cleanName = name.trim()
-    if (!cleanName || !binId) return
-
+    if (!cleanName || !roomId) return
     setSubmitting(true)
-    
+    // أجلب أحدث نسخة الأول عشان مفيش تعارض
+    await fetchRequests(roomId)
     const newItem: PrayerRequest = {
-      id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+      id: Date.now().toString(36) + Math.random().toString(36).substr(2, 6),
       name: cleanName,
       note: note.trim(),
       prayed: 0,
       createdAt: new Date().toISOString(),
     }
-
-    const newList = [newItem, ...requests].slice(0, 50)
-    setRequests(newList)
+    // هعمل re-fetch عشان أخد آخر نسخة
+    let latest: PrayerRequest[] = []
+    try {
+      const r = await fetch(`${BLOB_API}/${roomId}`, {
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }
+      })
+      const data = await r.json()
+      latest = Array.isArray(data.requests) ? data.requests : []
+    } catch { latest = requests }
+    
+    const newList = [newItem, ...latest].slice(0, 100)
+    setRequests(newList.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()))
     setName('')
     setNote('')
-    
-    await saveRequests(binId, newList)
+    await saveRequests(roomId, newList)
     setSubmitting(false)
   }
 
+  // دعيت له
   const prayFor = async (id: string) => {
-    if (!binId) return
-    const newList = requests.map(item => 
+    if (!roomId) return
+    const newPrayed = new Set(prayedIds)
+    newPrayed.add(id)
+    setPrayedIds(newPrayed)
+
+    const newList = requests.map(item =>
       item.id === id ? { ...item, prayed: item.prayed + 1 } : item
     )
     setRequests(newList)
-    await saveRequests(binId, newList)
+    await saveRequests(roomId, newList)
   }
 
-  const refreshData = async () => {
-    if (!binId) return
-    setLoading(true)
-    await fetchRequests(binId)
-    setLoading(false)
+  // نسخ كود الغرفة
+  const copyRoomCode = () => {
+    navigator.clipboard?.writeText(roomId).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    })
   }
 
-  if (loading) {
+  // مشاركة رابط الغرفة
+  const shareRoom = () => {
+    const url = `${window.location.origin}${window.location.pathname}?room=${roomId}`
+    const text = `ادعوا لنا بظهر الغيب 🤲\nافتح الرابط وادخل اسمك:\n${url}`
+    if (navigator.share) {
+      navigator.share({ text, url }).catch(() => {
+        navigator.clipboard?.writeText(text)
+      })
+    } else {
+      navigator.clipboard?.writeText(text).then(() => {
+        setCopied(true)
+        setTimeout(() => setCopied(false), 2000)
+      })
+    }
+  }
+
+  // ========= شاشة القائمة الرئيسية =========
+  if (screen === 'menu') {
+    // تحميل آخر غرفة محفوظة
+    const savedRoom = (() => { try { return localStorage.getItem('thikr_room') || '' } catch { return '' } })()
+
     return (
-      <div style={{ textAlign: 'center', padding: '60px 20px' }}>
-        <div style={{
-          width: 50, height: 50,
-          border: '4px solid #a7f3d0',
-          borderTop: '4px solid #059669',
-          borderRadius: '50%',
-          animation: 'spin 1s linear infinite',
-          margin: '0 auto 16px'
-        }} />
-        <p style={{ color: '#065f46' }}>جاري التحميل...</p>
+      <div>
+        <div style={{ textAlign: 'center', marginBottom: 24 }}>
+          <span style={styles.badge('#ecfdf5', '#047857')}>🤲 ادعوا لي بظهر الغيب</span>
+        </div>
+
+        <div style={{ textAlign: 'center', marginBottom: 24 }}>
+          <div style={{ fontSize: 60, marginBottom: 12 }}>🤲</div>
+          <p style={{ color: '#334155', fontSize: 15, lineHeight: 1.9, fontFamily: amiri }}>
+            أنشئ غرفة دعاء وشارك الكود مع أهلك وأصحابك، كل واحد يكتب اسمه والكل يدعي لبعض بظهر الغيب
+          </p>
+        </div>
+
+        {error && (
+          <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 12, padding: 12, marginBottom: 16, color: '#dc2626', textAlign: 'center', fontSize: 14 }}>
+            {error}
+          </div>
+        )}
+
+        {/* إنشاء غرفة */}
+        <button
+          onClick={createRoom}
+          disabled={loading}
+          style={{
+            ...styles.btnFull('linear-gradient(135deg,#10b981,#059669)', '#fff'),
+            marginBottom: 12,
+            opacity: loading ? 0.6 : 1,
+            fontSize: 17
+          }}
+        >
+          {loading ? '⏳ جاري الإنشاء...' : '✨ أنشئ غرفة دعاء جديدة'}
+        </button>
+
+        {/* فاصل */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '16px 0' }}>
+          <div style={{ flex: 1, height: 1, background: '#e5e7eb' }} />
+          <span style={{ color: '#9ca3af', fontSize: 13 }}>أو</span>
+          <div style={{ flex: 1, height: 1, background: '#e5e7eb' }} />
+        </div>
+
+        {/* الانضمام لغرفة */}
+        <div style={{ background: '#f8fafc', borderRadius: 16, padding: 16, border: '1px solid #e2e8f0' }}>
+          <p style={{ color: '#475569', fontSize: 14, marginBottom: 10, textAlign: 'center' }}>عندك كود غرفة؟ ادخله هنا</p>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input
+              value={joinCode}
+              onChange={e => setJoinCode(e.target.value)}
+              placeholder="كود الغرفة..."
+              style={{
+                flex: 1,
+                padding: '12px 14px',
+                borderRadius: 12,
+                border: '1px solid #d1d5db',
+                fontSize: 14,
+                outline: 'none',
+                textAlign: 'center',
+                direction: 'ltr'
+              }}
+            />
+            <button
+              onClick={() => joinRoom(joinCode)}
+              disabled={!joinCode.trim() || loading}
+              style={{
+                padding: '12px 20px',
+                borderRadius: 12,
+                border: 'none',
+                background: joinCode.trim() ? '#2563eb' : '#e5e7eb',
+                color: '#fff',
+                fontWeight: 700,
+                cursor: joinCode.trim() ? 'pointer' : 'not-allowed'
+              }}
+            >
+              دخول
+            </button>
+          </div>
+        </div>
+
+        {/* آخر غرفة */}
+        {savedRoom && (
+          <button
+            onClick={() => joinRoom(savedRoom)}
+            style={{
+              width: '100%',
+              marginTop: 12,
+              padding: 14,
+              borderRadius: 12,
+              border: '2px solid #d1fae5',
+              background: '#ecfdf5',
+              color: '#047857',
+              fontWeight: 700,
+              cursor: 'pointer',
+              fontSize: 14
+            }}
+          >
+            🔄 فتح آخر غرفة دخلتها
+          </button>
+        )}
       </div>
     )
   }
 
+  // ========= شاشة الغرفة =========
   return (
     <div>
-      <div style={{ textAlign: 'center', marginBottom: 20 }}>
-        <span style={styles.badge('#ecfdf5', '#047857')}>🤲 ادعوا لي بظهر الغيب</span>
+      <div style={{ textAlign: 'center', marginBottom: 16 }}>
+        <span style={styles.badge('#ecfdf5', '#047857')}>🤲 غرفة الدعاء</span>
+      </div>
+
+      {/* كود الغرفة + مشاركة */}
+      <div style={{
+        background: 'linear-gradient(135deg,#1e40af,#3b82f6)',
+        borderRadius: 16,
+        padding: 16,
+        marginBottom: 16,
+        color: '#fff'
+      }}>
+        <p style={{ fontSize: 12, marginBottom: 8, opacity: 0.8 }}>كود الغرفة — شاركه مع من تحب</p>
+        <div style={{ 
+          background: 'rgba(255,255,255,0.15)', 
+          borderRadius: 10, 
+          padding: '10px 14px', 
+          textAlign: 'center', 
+          marginBottom: 12,
+          fontFamily: 'monospace',
+          fontSize: 13,
+          letterSpacing: 1,
+          direction: 'ltr',
+          wordBreak: 'break-all'
+        }}>
+          {roomId}
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={copyRoomCode} style={{
+            flex: 1, padding: 10, borderRadius: 10, border: 'none', 
+            background: copied ? '#10b981' : 'rgba(255,255,255,0.2)',
+            color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: 13
+          }}>
+            {copied ? '✅ تم النسخ' : '📋 نسخ الكود'}
+          </button>
+          <button onClick={shareRoom} style={{
+            flex: 1, padding: 10, borderRadius: 10, border: 'none',
+            background: 'rgba(255,255,255,0.2)', color: '#fff',
+            fontWeight: 700, cursor: 'pointer', fontSize: 13
+          }}>
+            📤 مشاركة الرابط
+          </button>
+        </div>
       </div>
 
       {error && (
-        <div style={{
-          background: '#fef2f2',
-          border: '1px solid #fca5a5',
-          borderRadius: 12,
-          padding: 12,
-          marginBottom: 16,
-          color: '#dc2626',
-          textAlign: 'center',
-          fontSize: 14
-        }}>
+        <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 12, padding: 12, marginBottom: 12, color: '#dc2626', textAlign: 'center', fontSize: 13 }}>
           {error}
         </div>
       )}
 
+      {/* إضافة اسم */}
       <div style={{
-        background: 'linear-gradient(135deg,#ecfdf5,#d1fae5)',
+        background: '#ecfdf5',
         border: '1px solid #6ee7b7',
         borderRadius: 16,
         padding: 16,
         marginBottom: 16
       }}>
-        <p style={{ color: '#065f46', fontSize: 14, lineHeight: 1.8, textAlign: 'center', marginBottom: 14 }}>
-          ✨ اكتب اسمك أو اسم من تحب ليدعو لك كل من يفتح التطبيق
-        </p>
         <input
           value={name}
           onChange={e => setName(e.target.value)}
-          placeholder="الاسم..."
+          placeholder="اكتب اسمك أو اسم من تحب..."
           maxLength={50}
           style={{
-            width: '100%',
-            padding: '12px 14px',
-            borderRadius: 12,
-            border: '1px solid #a7f3d0',
-            marginBottom: 10,
-            fontSize: 14,
-            outline: 'none'
+            width: '100%', padding: '12px 14px', borderRadius: 12,
+            border: '1px solid #a7f3d0', marginBottom: 8, fontSize: 15, outline: 'none'
           }}
+          onKeyDown={e => { if (e.key === 'Enter') addRequest() }}
         />
         <textarea
           value={note}
           onChange={e => setNote(e.target.value)}
-          placeholder="دعوة مطلوبة (اختياري): الشفاء، الرحمة، التوفيق..."
+          placeholder="الدعوة المطلوبة (اختياري): الشفاء، التوفيق..."
           rows={2}
-          maxLength={100}
+          maxLength={150}
           style={{
-            width: '100%',
-            padding: '12px 14px',
-            borderRadius: 12,
-            border: '1px solid #a7f3d0',
-            marginBottom: 10,
-            fontSize: 14,
-            outline: 'none',
-            resize: 'none',
-            fontFamily: cairo
+            width: '100%', padding: '12px 14px', borderRadius: 12,
+            border: '1px solid #a7f3d0', marginBottom: 8, fontSize: 14,
+            outline: 'none', resize: 'none', fontFamily: cairo
           }}
         />
         <button
@@ -1755,92 +1926,85 @@ function PrayForMe() {
         </button>
       </div>
 
-      {/* زر التحديث */}
-      <button
-        onClick={refreshData}
-        style={{
-          width: '100%',
-          padding: 10,
-          borderRadius: 10,
-          border: '1px solid #d1fae5',
-          background: '#fff',
-          color: '#059669',
-          cursor: 'pointer',
-          fontWeight: 600,
-          marginBottom: 16,
-          fontSize: 13
-        }}
-      >
-        🔄 تحديث القائمة ({requests.length} اسم)
-      </button>
+      {/* أزرار */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+        <button onClick={() => fetchRequests(roomId)} style={{
+          flex: 1, padding: 10, borderRadius: 10,
+          border: '1px solid #d1fae5', background: '#fff',
+          color: '#059669', cursor: 'pointer', fontWeight: 600, fontSize: 13
+        }}>
+          🔄 تحديث ({requests.length})
+        </button>
+        <button onClick={() => setScreen('menu')} style={{
+          padding: '10px 16px', borderRadius: 10,
+          border: '1px solid #e2e8f0', background: '#fff',
+          color: '#64748b', cursor: 'pointer', fontWeight: 600, fontSize: 13
+        }}>
+          ← رجوع
+        </button>
+      </div>
 
-      {requests.length === 0 ? (
+      {/* قائمة الأسماء */}
+      {loading ? (
+        <div style={{ textAlign: 'center', padding: 40 }}>
+          <div style={{ width: 40, height: 40, border: '4px solid #a7f3d0', borderTop: '4px solid #059669', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto 12px' }} />
+          <p style={{ color: '#065f46', fontSize: 14 }}>جاري التحميل...</p>
+        </div>
+      ) : requests.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '30px 10px', color: '#94a3b8' }}>
-          <div style={{ fontSize: 40, marginBottom: 12 }}>🤲</div>
-          <p>كن أول من يضيف اسمه للدعاء!</p>
+          <div style={{ fontSize: 48, marginBottom: 12 }}>🤲</div>
+          <p style={{ fontSize: 15 }}>كن أول من يضيف اسمه!</p>
+          <p style={{ fontSize: 13, marginTop: 4 }}>شارك كود الغرفة مع أهلك وأصحابك</p>
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {requests.map(item => (
-            <div key={item.id} style={{
-              background: '#fff',
-              border: '1px solid #d1fae5',
-              borderRadius: 16,
-              padding: 16,
-              boxShadow: '0 4px 14px rgba(5,150,105,0.07)'
-            }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginBottom: 8 }}>
-                <div>
+          {requests.map(item => {
+            const alreadyPrayed = prayedIds.has(item.id)
+            return (
+              <div key={item.id} style={{
+                background: '#fff', border: '1px solid #d1fae5',
+                borderRadius: 16, padding: 16,
+                boxShadow: '0 2px 10px rgba(5,150,105,0.06)'
+              }}>
+                <div style={{ marginBottom: 8 }}>
                   <h3 style={{ color: '#065f46', fontSize: 18, margin: '0 0 4px' }}>{item.name}</h3>
-                  <p style={{ color: '#64748b', fontSize: 11, margin: 0 }}>
-                    {new Date(item.createdAt).toLocaleDateString('ar-EG')} • {item.prayed} دعوا له
+                  <p style={{ color: '#94a3b8', fontSize: 11, margin: 0 }}>
+                    {new Date(item.createdAt).toLocaleDateString('ar-EG')} • دعا له {item.prayed} شخص
                   </p>
                 </div>
+                {item.note && (
+                  <p style={{
+                    color: '#334155', lineHeight: 1.8, margin: '0 0 12px',
+                    fontFamily: amiri, fontSize: 17,
+                    background: '#f0fdf4', padding: '8px 12px', borderRadius: 8
+                  }}>
+                    {item.note}
+                  </p>
+                )}
+                <button
+                  onClick={() => !alreadyPrayed && prayFor(item.id)}
+                  disabled={alreadyPrayed}
+                  style={{
+                    width: '100%', padding: 12, borderRadius: 12, border: 'none',
+                    background: alreadyPrayed
+                      ? '#f0fdf4'
+                      : 'linear-gradient(135deg,#059669,#047857)',
+                    color: alreadyPrayed ? '#059669' : '#fff',
+                    cursor: alreadyPrayed ? 'default' : 'pointer',
+                    fontWeight: 700, fontSize: 15
+                  }}
+                >
+                  {alreadyPrayed ? '✅ دعوت له — جزاك الله خيراً' : '🤲 اللهم استجب — دعوت له'}
+                </button>
               </div>
-              {item.note && (
-                <p style={{ 
-                  color: '#334155', 
-                  lineHeight: 1.8, 
-                  margin: '0 0 12px', 
-                  fontFamily: amiri, 
-                  fontSize: 17,
-                  background: '#f8fafc',
-                  padding: '8px 12px',
-                  borderRadius: 8
-                }}>
-                  {item.note}
-                </p>
-              )}
-              <button
-                onClick={() => prayFor(item.id)}
-                style={{
-                  width: '100%',
-                  padding: 12,
-                  borderRadius: 12,
-                  border: 'none',
-                  background: 'linear-gradient(135deg,#059669,#047857)',
-                  color: '#fff',
-                  cursor: 'pointer',
-                  fontWeight: 700,
-                  fontSize: 15
-                }}
-              >
-                🤲 دعوت له
-              </button>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
 
-      <div style={{
-        marginTop: 20,
-        padding: 14,
-        background: '#fffbeb',
-        borderRadius: 12,
-        border: '1px solid #fcd34d'
-      }}>
+      <div style={{ marginTop: 20, padding: 14, background: '#fffbeb', borderRadius: 12, border: '1px solid #fcd34d' }}>
         <p style={{ color: '#92400e', fontSize: 12, textAlign: 'center', margin: 0, lineHeight: 1.8 }}>
-          💡 الأسماء تُحذف تلقائياً بعد 7 أيام • شارك التطبيق ليدعو لك المزيد
+          💡 شارك كود الغرفة ليدعو لك أكثر ناس • الأسماء تُحذف بعد 7 أيام
         </p>
       </div>
     </div>
