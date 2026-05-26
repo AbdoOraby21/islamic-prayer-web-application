@@ -1428,7 +1428,7 @@ function Quiz() {
 // ========== Dua Requests (ادعوا لي بظهر الغيب) ==========
 // استخدام JSONBin المجاني
 const JSONBIN_API = 'https://api.jsonbin.io/v3/b'
-const BIN_ID = '683ee8418960c979a5a075f1' // سيتم إنشاؤه تلقائياً
+const BIN_ID = '6a15d85c0ccfe462544f6061' // سيتم إنشاؤه تلقائياً
 
 type DuaRequestItem = {
   id: string
@@ -1464,7 +1464,7 @@ function DuaRequests() {
     try {
       const res = await fetch(`${JSONBIN_API}/${BIN_ID}/latest`, {
         headers: {
-          'X-Access-Key': '$2a$10$YOUR_ACCESS_KEY' // مفتاح عام للقراءة
+          'X-Access-Key': '$2a$10$Zj9Cb9wJmNpdpmoktLgKhe4yPWSGVEF3Qw4QCaBMNce4EKEiI4foG' // مفتاح عام للقراءة
         }
       })
       
@@ -1507,7 +1507,7 @@ function DuaRequests() {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'X-Access-Key': '$2a$10$YOUR_ACCESS_KEY'
+          'X-Access-Key': '$2a$10$Zj9Cb9wJmNpdpmoktLgKhe4yPWSGVEF3Qw4QCaBMNce4EKEiI4foG'
         },
         body: JSON.stringify({ requests: newRequests })
       })
