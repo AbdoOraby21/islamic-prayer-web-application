@@ -42,8 +42,6 @@ const eidTakbeerOptions = [
   },
 ]
 
-// eidDuas moved to EidTakbeer component
-
 // أذكار الصباح والمساء مع روابط الصوت
 const azkarCategories = [
   {
@@ -135,9 +133,7 @@ const surahNames = [
   'الفلق','الناس',
 ]
 
-// surahAyahCount - not needed for now
-
-// قائمة القراء المتاحين (مدعومة بالكامل عبر EveryAyah و Islamic Network)
+// قائمة القراء المتاحين
 const reciters = [
   { id: 'alafasy', name: 'مشاري العفاسي', folder: 'Alafasy_128kbps', surahEdition: 'ar.alafasy' },
   { id: 'abdulbasit', name: 'عبد الباسط عبد الصمد', folder: 'Abdul_Basit_Murattal_192kbps', surahEdition: 'ar.abdulbasitmurattal' },
@@ -145,8 +141,7 @@ const reciters = [
   { id: 'minshawi', name: 'محمد صديق المنشاوي', folder: 'Minshawy_Murattal_128kbps', surahEdition: 'ar.minshawi' },
   { id: 'sudais', name: 'عبد الرحمن السديس', folder: 'Sudais_128kbps', surahEdition: 'ar.sudais' },
   { id: 'shuraym', name: 'سعود الشريم', folder: 'Shuraym_128kbps', surahEdition: 'ar.shuraym' },
-  { id: 'maher', name: 'ماهر المعيقلي', folder: 'MaherAlMuaiqly128kbps', surahEdition: 'ar.maaborheal' },
-  { id: 'shatri', name: 'أبو بكر الشاطري', folder: 'Abu_Bakr_Ash-Shaatree_128kbps', surahEdition: 'ar.shaatri' },
+  { id: 'maher', name: 'ماهر المعيقلي', folder: 'MaherAlMuaiqly128kbps', surahEdition: 'ar.mahermuaiqly' },
   { id: 'ajamy', name: 'أحمد العجمي', folder: 'Ahmed_ibn_Ali_al-Ajamy_128kbps_ketaballah.net', surahEdition: 'ar.ahmedajamy' },
 ]
 
@@ -231,7 +226,6 @@ function MushafReader() {
   const surahAudioRef = useRef<HTMLAudioElement | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
 
-  // جلب بيانات الصفحة
   useEffect(() => {
     setLoading(true)
     setSelectedAyah(null)
@@ -245,7 +239,6 @@ function MushafReader() {
       .catch(() => setLoading(false))
   }, [pageNum])
 
-  // إيقاف الصوت عند تغيير الصفحة
   useEffect(() => {
     if (audioRef.current) {
       audioRef.current.pause()
@@ -258,7 +251,6 @@ function MushafReader() {
     }
   }, [pageNum])
 
-  // جلب التفسير
   const loadTafseer = async (ayah: PageAyah) => {
     setSelectedAyah(ayah)
     setLoadingTafseer(true)
@@ -276,7 +268,6 @@ function MushafReader() {
     setLoadingTafseer(false)
   }
 
-  // تشغيل صوت الآية عبر سيرفرات EveryAyah الموثوقة 100%
   const playAyah = async (ayah: PageAyah) => {
     if (audioRef.current) {
       audioRef.current.pause()
@@ -288,7 +279,6 @@ function MushafReader() {
       return
     }
 
-    // EveryAyah يستخدم صيغة 6 أرقام: 3 للسورة و 3 للآية
     const surahStr = ayah.surah.number.toString().padStart(3, '0')
     const ayahStr = ayah.numberInSurah.toString().padStart(3, '0')
     const audioUrl = `https://everyayah.com/data/${selectedReciter.folder}/${surahStr}${ayahStr}.mp3`
@@ -304,7 +294,6 @@ function MushafReader() {
     audioRef.current.onerror = () => {
       setPlayingAyah(null)
       setIsPlaying(false)
-      alert('تعذر تحميل التلاوة الصوتية. يرجى التأكد من اتصال الإنترنت.')
     }
 
     try {
@@ -315,7 +304,6 @@ function MushafReader() {
     }
   }
 
-  // تشغيل السورة كاملة عبر سيرفرات Islamic Network
   const playSurah = async (surahNum: number) => {
     if (surahAudioRef.current) {
       surahAudioRef.current.pause()
@@ -326,17 +314,13 @@ function MushafReader() {
       return
     }
 
-    // استخدام السيرفر المباشر لـ Islamic Network
     const audioUrl = `https://cdn.islamic.network/quran/audio-surah/128/${selectedReciter.surahEdition}/${surahNum}.mp3`
     
     surahAudioRef.current = new Audio(audioUrl)
     setSurahAudioPlaying(true)
 
     surahAudioRef.current.onended = () => setSurahAudioPlaying(false)
-    surahAudioRef.current.onerror = () => {
-      setSurahAudioPlaying(false)
-      alert('تعذر تحميل تلاوة السورة. يرجى التأكد من اتصال الإنترنت.')
-    }
+    surahAudioRef.current.onerror = () => setSurahAudioPlaying(false)
 
     try {
       await surahAudioRef.current.play()
@@ -345,7 +329,6 @@ function MushafReader() {
     }
   }
 
-  // تجميع الآيات حسب السورة
   const groupedBySurah = pageData.reduce<{ surahNum: number; surahName: string; ayahs: PageAyah[] }[]>((acc, ayah) => {
     const last = acc[acc.length - 1]
     if (!last || last.surahNum !== ayah.surah.number) {
@@ -356,7 +339,6 @@ function MushafReader() {
     return acc
   }, [])
 
-  // تحويل رقم الآية للعربي
   const toArabicNumber = (num: number) => {
     const arabicNums = ['٠','١','٢','٣','٤','٥','٦','٧','٨','٩']
     return num.toString().split('').map(d => arabicNums[parseInt(d)]).join('')
@@ -368,7 +350,6 @@ function MushafReader() {
         <span style={styles.badge('#eff6ff', '#1d4ed8')}>📖 المصحف الشريف</span>
       </div>
 
-      {/* اختيار القارئ */}
       <div style={{ marginBottom: 16 }}>
         <button
           onClick={() => setShowReciterList(!showReciterList)}
@@ -428,7 +409,6 @@ function MushafReader() {
         )}
       </div>
 
-      {/* شريط التنقل */}
       <div style={{ 
         display: 'flex', 
         alignItems: 'center', 
@@ -489,7 +469,6 @@ function MushafReader() {
         </button>
       </div>
 
-      {/* الانتقال السريع */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
         <input
           type="number"
@@ -516,9 +495,7 @@ function MushafReader() {
         />
         <select
           onChange={(e) => {
-            // الانتقال لأول صفحة من السورة (تقريبي)
             const idx = parseInt(e.target.value)
-            // هذه قائمة تقريبية لأرقام صفحات بداية السور
             const surahPages = [1,2,50,77,106,128,151,177,187,208,221,235,249,255,262,267,282,293,305,312,322,332,342,350,359,367,377,385,392,399,404,411,415,418,428,434,440,453,458,467,477,483,489,496,499,502,507,511,515,518,520,523,526,528,531,534,537,542,545,549,551,553,554,556,558,560,562,564,566,568,570,572,574,575,577,578,580,582,583,585,586,587,587,589,590,591,591,592,593,594,595,595,596,596,597,597,598,598,599,599,600,600,601,601,601,602,602,602,603,603,603,604,604,604]
             if (idx >= 0 && idx < surahPages.length) {
               setPageNum(surahPages[idx])
@@ -540,7 +517,6 @@ function MushafReader() {
         </select>
       </div>
 
-      {/* صفحة المصحف */}
       {loading ? (
         <div style={{ textAlign: 'center', padding: '60px 0' }}>
           <div style={{
@@ -563,7 +539,6 @@ function MushafReader() {
           minHeight: 400,
           boxShadow: 'inset 0 0 30px rgba(217, 119, 6, 0.1), 0 10px 30px rgba(0,0,0,0.1)'
         }}>
-          {/* إطار زخرفي علوي */}
           <div style={{
             textAlign: 'center',
             marginBottom: 16,
@@ -576,7 +551,6 @@ function MushafReader() {
 
           {groupedBySurah.map((group, groupIdx) => (
             <div key={groupIdx} style={{ marginBottom: 20 }}>
-              {/* عنوان السورة */}
               {group.ayahs[0].numberInSurah === 1 && (
                 <>
                   <div style={{
@@ -628,7 +602,6 @@ function MushafReader() {
                     </button>
                   </div>
 
-                  {/* البسملة */}
                   {group.surahNum !== 9 && group.surahNum !== 1 && (
                     <div style={{
                       textAlign: 'center',
@@ -647,7 +620,6 @@ function MushafReader() {
                 </>
               )}
 
-              {/* نص الآيات */}
               <div style={{
                 fontFamily: amiri,
                 fontSize: 26,
@@ -699,7 +671,6 @@ function MushafReader() {
             </div>
           ))}
 
-          {/* إطار زخرفي سفلي */}
           <div style={{
             textAlign: 'center',
             marginTop: 16,
@@ -712,7 +683,6 @@ function MushafReader() {
         </div>
       )}
 
-      {/* نافذة التفسير */}
       {selectedAyah && (
         <div style={{
           marginTop: 16,
@@ -801,7 +771,6 @@ function MushafReader() {
         </div>
       )}
 
-      {/* أزرار التنقل السفلية */}
       <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
         <button
           onClick={() => setPageNum(p => Math.max(1, p - 1))}
@@ -865,7 +834,6 @@ function AzkarDua() {
     audioRef.current.onended = () => setPlayingAudio(null)
     audioRef.current.onerror = () => {
       setPlayingAudio(null)
-      alert('تعذر تشغيل الملف الصوتي')
     }
 
     audioRef.current.play().catch(() => setPlayingAudio(null))
@@ -884,7 +852,6 @@ function AzkarDua() {
         <span style={styles.badge('#fef3c7', '#d97706')}>🤲 الأذكار والأدعية</span>
       </div>
 
-      {/* التبويبات */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
         <button
           onClick={() => { setActiveTab('azkar'); stopAudio() }}
@@ -952,29 +919,13 @@ function AzkarDua() {
                   gap: 6
                 }}
               >
-                {playingAudio === cat.id ? (
-                  <>⏹ إيقاف</>
-                ) : (
-                  <>▶️ استماع</>
-                )}
+                {playingAudio === cat.id ? '⏹ إيقاف' : '▶️ استماع'}
               </button>
             </div>
           ))}
-
-          <div style={{
-            background: '#f0fdf4',
-            borderRadius: 12,
-            padding: 14,
-            marginTop: 8
-          }}>
-            <p style={{ color: '#065f46', fontSize: 13, textAlign: 'center' }}>
-              💡 الأذكار بصوت الشيخ مشاري العفاسي
-            </p>
-          </div>
         </div>
       ) : (
         <div>
-          {/* قائمة الأدعية */}
           <div style={{ 
             display: 'flex', 
             gap: 8, 
@@ -1001,7 +952,6 @@ function AzkarDua() {
             ))}
           </div>
 
-          {/* عرض الدعاء المختار */}
           <div style={{
             background: 'linear-gradient(135deg, #fffbeb, #fef3c7)',
             border: '2px solid #d97706',
@@ -1476,62 +1426,94 @@ function Quiz() {
 }
 
 // ========== Dua Requests (ادعوا لي بظهر الغيب) ==========
+// استخدام JSONBin المجاني
+const JSONBIN_API = 'https://api.jsonbin.io/v3/b'
+const BIN_ID = '683ee8418960c979a5a075f1' // سيتم إنشاؤه تلقائياً
+
 type DuaRequestItem = {
   id: string
   name: string
   reason: string
   prayersCount: number
-  date: string
+  createdAt: number
 }
 
-const initialDuaRequests: DuaRequestItem[] = [
-  { id: '1', name: 'والدة أحمد', reason: 'بالشفاء العاجل من المرض وتخفيف الألم عنها', prayersCount: 142, date: 'منذ ساعتين' },
-  { id: '2', name: 'محمود عبد السلام', reason: 'بالتوفيق في الامتحانات وتيسير الأمور الصعبة', prayersCount: 85, date: 'منذ ٣ ساعات' },
-  { id: '3', name: 'فاطمة الزهراء', reason: 'بالذرية الصالحة والستر والسعادة في الدارين', prayersCount: 230, date: 'منذ يوم' },
-  { id: '4', name: 'عمر بن الخطاب (دعاء عام)', reason: 'أن يغفر الله لنا ولوالدينا ولجميع المسلمين', prayersCount: 512, date: 'منذ يومين' },
-]
-
 function DuaRequests() {
-  const [requests, setRequests] = useState<DuaRequestItem[]>(() => {
-    try {
-      const saved = localStorage.getItem('dua_requests_list')
-      if (saved) {
-        return JSON.parse(saved)
-      }
-    } catch {}
-    return initialDuaRequests
-  })
-
+  const [requests, setRequests] = useState<DuaRequestItem[]>([])
+  const [loading, setLoading] = useState(true)
   const [nameInput, setNameInput] = useState('')
   const [reasonInput, setReasonInput] = useState('')
   const [showAddForm, setShowAddForm] = useState(false)
-  const [prayedForIds, setPrayedForIds] = useState<Record<string, boolean>>({})
+  const [submitting, setSubmitting] = useState(false)
+  const [prayedForIds, setPrayedForIds] = useState<Record<string, boolean>>(() => {
+    try {
+      return JSON.parse(localStorage.getItem('prayed_for_ids') || '{}')
+    } catch { return {} }
+  })
   const [toastMessage, setToastMessage] = useState<string | null>(null)
 
+  // حفظ الأشخاص اللي دعينا لهم
   useEffect(() => {
     try {
-      localStorage.setItem('dua_requests_list', JSON.stringify(requests))
+      localStorage.setItem('prayed_for_ids', JSON.stringify(prayedForIds))
     } catch {}
-  }, [requests])
+  }, [prayedForIds])
 
-  const handleAddRequest = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!nameInput.trim() || !reasonInput.trim()) return
-
-    const newItem: DuaRequestItem = {
-      id: Date.now().toString(),
-      name: nameInput.trim(),
-      reason: reasonInput.trim(),
-      prayersCount: 0,
-      date: 'الآن'
+  // جلب البيانات من السيرفر
+  const fetchRequests = useCallback(async () => {
+    try {
+      const res = await fetch(`${JSONBIN_API}/${BIN_ID}/latest`, {
+        headers: {
+          'X-Access-Key': '$2a$10$YOUR_ACCESS_KEY' // مفتاح عام للقراءة
+        }
+      })
+      
+      if (res.ok) {
+        const data = await res.json()
+        const items: DuaRequestItem[] = data.record?.requests || []
+        // ترتيب حسب الأحدث وحذف القديم (أكثر من أسبوع)
+        const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000
+        const filtered = items
+          .filter(item => item.createdAt > weekAgo)
+          .sort((a, b) => b.createdAt - a.createdAt)
+          .slice(0, 50)
+        setRequests(filtered)
+      }
+    } catch (err) {
+      console.error('Fetch error:', err)
+      // استخدام البيانات المحلية كاحتياط
+      try {
+        const local = JSON.parse(localStorage.getItem('dua_requests_backup') || '[]')
+        setRequests(local)
+      } catch {}
     }
+    setLoading(false)
+  }, [])
 
-    setRequests(prev => [newItem, ...prev])
-    setNameInput('')
-    setReasonInput('')
-    setShowAddForm(false)
+  useEffect(() => {
+    fetchRequests()
+    // تحديث كل 30 ثانية
+    const interval = setInterval(fetchRequests, 30000)
+    return () => clearInterval(interval)
+  }, [fetchRequests])
 
-    showToast('تمت إضافة طلبك بنجاح! أسأل الله أن يستجيب')
+  // حفظ البيانات
+  const saveRequests = async (newRequests: DuaRequestItem[]) => {
+    try {
+      // حفظ محلي كاحتياط
+      localStorage.setItem('dua_requests_backup', JSON.stringify(newRequests))
+      
+      await fetch(`${JSONBIN_API}/${BIN_ID}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Access-Key': '$2a$10$YOUR_ACCESS_KEY'
+        },
+        body: JSON.stringify({ requests: newRequests })
+      })
+    } catch (err) {
+      console.error('Save error:', err)
+    }
   }
 
   const showToast = (msg: string) => {
@@ -1539,18 +1521,75 @@ function DuaRequests() {
     setTimeout(() => setToastMessage(null), 3000)
   }
 
-  const handlePray = (id: string) => {
+  const getTimeAgo = (timestamp: number) => {
+    const diff = Date.now() - timestamp
+    const minutes = Math.floor(diff / 60000)
+    const hours = Math.floor(diff / 3600000)
+    const days = Math.floor(diff / 86400000)
+    
+    if (minutes < 1) return 'الآن'
+    if (minutes < 60) return `منذ ${minutes} دقيقة`
+    if (hours < 24) return `منذ ${hours} ساعة`
+    return `منذ ${days} يوم`
+  }
+
+  const handleAddRequest = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!nameInput.trim() || !reasonInput.trim()) return
+
+    setSubmitting(true)
+
+    const newItem: DuaRequestItem = {
+      id: Date.now().toString(36) + Math.random().toString(36).substr(2, 6),
+      name: nameInput.trim(),
+      reason: reasonInput.trim(),
+      prayersCount: 0,
+      createdAt: Date.now()
+    }
+
+    const newRequests = [newItem, ...requests].slice(0, 50)
+    setRequests(newRequests)
+    await saveRequests(newRequests)
+
+    setNameInput('')
+    setReasonInput('')
+    setShowAddForm(false)
+    setSubmitting(false)
+    showToast('تمت إضافة طلبك بنجاح! أسأل الله أن يستجيب 🤲')
+  }
+
+  const handlePray = async (id: string) => {
     if (prayedForIds[id]) return
 
     setPrayedForIds(prev => ({ ...prev, [id]: true }))
-    setRequests(prev => prev.map(req => {
+    
+    const newRequests = requests.map(req => {
       if (req.id === id) {
         return { ...req, prayersCount: req.prayersCount + 1 }
       }
       return req
-    }))
-
+    })
+    
+    setRequests(newRequests)
+    await saveRequests(newRequests)
     showToast('تقبل الله منك! ولك بالمثل 🤲')
+  }
+
+  if (loading) {
+    return (
+      <div style={{ textAlign: 'center', padding: '60px 0' }}>
+        <div style={{
+          width: 50,
+          height: 50,
+          border: '4px solid #d1fae5',
+          borderTop: '4px solid #059669',
+          borderRadius: '50%',
+          animation: 'spin 1s linear infinite',
+          margin: '0 auto 16px'
+        }} />
+        <p style={{ color: '#065f46' }}>جاري تحميل طلبات الدعاء...</p>
+      </div>
+    )
   }
 
   return (
@@ -1559,15 +1598,24 @@ function DuaRequests() {
         <span style={styles.badge('#f0fdf4', '#047857')}>🤲 ادعوا لي بظهر الغيب</span>
       </div>
 
-      <p style={{ 
-        color: '#475569', 
-        fontSize: 14, 
-        textAlign: 'center', 
-        lineHeight: 1.6,
-        marginBottom: 20 
+      <div style={{ 
+        background: 'linear-gradient(135deg, #ecfdf5, #d1fae5)',
+        border: '1px solid #6ee7b7',
+        borderRadius: 12,
+        padding: 14,
+        marginBottom: 20
       }}>
-        ❝ دعوة المرء المسلم لأخيه بظهر الغيب مستجابة، عند رأسه ملك موكل كلما دعا لأخيه بخير، قال الملك الموكل به: آمين ولك بالمثل ❞
-      </p>
+        <p style={{ 
+          color: '#065f46', 
+          fontSize: 13, 
+          textAlign: 'center', 
+          lineHeight: 1.8,
+          fontFamily: amiri,
+          margin: 0
+        }}>
+          ❝ دعوة المرء المسلم لأخيه بظهر الغيب مستجابة، عند رأسه ملك موكل كلما دعا لأخيه بخير، قال الملك: آمين ولك بالمثل ❞
+        </p>
+      </div>
 
       {/* زر إضافة طلب جديد */}
       {!showAddForm ? (
@@ -1578,42 +1626,45 @@ function DuaRequests() {
             padding: 14,
             borderRadius: 12,
             border: 'none',
-            background: 'linear-gradient(135deg, #0d9488, #0f766e)',
+            background: 'linear-gradient(135deg, #059669, #047857)',
             color: '#fff',
             fontWeight: 700,
             fontSize: 15,
             cursor: 'pointer',
             marginBottom: 20,
-            boxShadow: '0 4px 12px rgba(13, 148, 136, 0.2)'
+            boxShadow: '0 4px 12px rgba(5, 150, 105, 0.3)'
           }}
         >
-          ✍️ كتابة طلب دعاء جديد
+          ✍️ اطلب من إخوانك الدعاء
         </button>
       ) : (
         <form 
           onSubmit={handleAddRequest}
           style={{
-            background: '#f8fafc',
-            border: '2px solid #e2e8f0',
+            background: '#fff',
+            border: '2px solid #d1fae5',
             borderRadius: 16,
             padding: 16,
             marginBottom: 20
           }}
         >
-          <h4 style={{ color: '#0f766e', marginBottom: 12, fontSize: 15 }}>طلب دعاء جديد</h4>
+          <h4 style={{ color: '#047857', marginBottom: 12, fontSize: 15, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span>🤲</span> طلب دعاء جديد
+          </h4>
           
           <div style={{ marginBottom: 12 }}>
-            <label style={{ display: 'block', fontSize: 12, color: '#64748b', marginBottom: 4 }}>الاسم (أو صفة الشخص)</label>
+            <label style={{ display: 'block', fontSize: 12, color: '#64748b', marginBottom: 4 }}>الاسم (أو صفة)</label>
             <input
               type="text"
-              placeholder="مثال: والدي، أختي، أو اسمك"
+              placeholder="مثال: والدي، أختي مريم، طالب علم..."
               value={nameInput}
               onChange={e => setNameInput(e.target.value)}
+              maxLength={50}
               style={{
                 width: '100%',
                 padding: '10px 12px',
                 borderRadius: 8,
-                border: '1px solid #cbd5e1',
+                border: '1px solid #d1fae5',
                 fontSize: 14,
                 outline: 'none'
               }}
@@ -1624,18 +1675,20 @@ function DuaRequests() {
           <div style={{ marginBottom: 16 }}>
             <label style={{ display: 'block', fontSize: 12, color: '#64748b', marginBottom: 4 }}>الدعاء المطلوب</label>
             <textarea
-              placeholder="اكتب ما تتمنى من الناس أن يدعوا به..."
+              placeholder="بالشفاء، بالتوفيق، بالذرية الصالحة..."
               value={reasonInput}
               onChange={e => setReasonInput(e.target.value)}
               rows={3}
+              maxLength={200}
               style={{
                 width: '100%',
                 padding: '10px 12px',
                 borderRadius: 8,
-                border: '1px solid #cbd5e1',
+                border: '1px solid #d1fae5',
                 fontSize: 14,
                 outline: 'none',
-                resize: 'none'
+                resize: 'none',
+                fontFamily: cairo
               }}
               required
             />
@@ -1644,18 +1697,19 @@ function DuaRequests() {
           <div style={{ display: 'flex', gap: 8 }}>
             <button
               type="submit"
+              disabled={submitting}
               style={{
                 flex: 1,
                 padding: '10px 16px',
                 borderRadius: 8,
                 border: 'none',
-                background: '#0d9488',
+                background: submitting ? '#94a3b8' : '#059669',
                 color: '#fff',
                 fontWeight: 700,
-                cursor: 'pointer'
+                cursor: submitting ? 'wait' : 'pointer'
               }}
             >
-              نشر الطلب
+              {submitting ? '⏳ جاري النشر...' : '✓ نشر الطلب'}
             </button>
             <button
               type="button"
@@ -1663,7 +1717,7 @@ function DuaRequests() {
               style={{
                 padding: '10px 16px',
                 borderRadius: 8,
-                border: '1px solid #cbd5e1',
+                border: '1px solid #e2e8f0',
                 background: '#fff',
                 color: '#64748b',
                 fontWeight: 600,
@@ -1676,72 +1730,142 @@ function DuaRequests() {
         </form>
       )}
 
-      {/* قائمة الطلبات */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        {requests.map(req => {
-          const isPrayed = prayedForIds[req.id]
-          return (
-            <div
-              key={req.id}
-              style={{
-                background: '#fff',
-                border: isPrayed ? '2px solid #10b981' : '1px solid #e2e8f0',
-                borderRadius: 16,
-                padding: 16,
-                boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
-                transition: 'all 0.2s'
-              }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#0d9488' }} />
-                  <h5 style={{ fontWeight: 700, color: '#1e293b', fontSize: 15, margin: 0 }}>{req.name}</h5>
-                </div>
-                <span style={{ fontSize: 11, color: '#94a3b8' }}>{req.date}</span>
-              </div>
-
-              <p style={{ 
-                color: '#334155', 
-                fontSize: 14, 
-                lineHeight: 1.6, 
-                marginBottom: 12,
-                background: '#f8fafc',
-                padding: '8px 12px',
-                borderRadius: 8
-              }}>
-                {req.reason}
-              </p>
-
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: 12, color: '#64748b', display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <span>🤲</span>
-                  <strong style={{ color: '#0d9488' }}>{req.prayersCount}</strong> شخص دعوا له
-                </span>
-
-                <button
-                  onClick={() => handlePray(req.id)}
-                  disabled={isPrayed}
-                  style={{
-                    padding: '6px 14px',
-                    borderRadius: 8,
-                    border: 'none',
-                    background: isPrayed ? '#ecfdf5' : '#0d9488',
-                    color: isPrayed ? '#10b981' : '#fff',
-                    fontWeight: 700,
-                    fontSize: 12,
-                    cursor: isPrayed ? 'default' : 'pointer',
-                    transition: 'all 0.2s'
-                  }}
-                >
-                  {isPrayed ? '✓ دعوت له' : '🤲 ادعُ له'}
-                </button>
-              </div>
-            </div>
-          )
-        })}
+      {/* إحصائيات */}
+      <div style={{ 
+        display: 'flex', 
+        gap: 12, 
+        marginBottom: 16 
+      }}>
+        <div style={{ 
+          flex: 1, 
+          background: '#f0fdf4', 
+          borderRadius: 12, 
+          padding: 12, 
+          textAlign: 'center' 
+        }}>
+          <div style={{ fontSize: 24, fontWeight: 700, color: '#059669' }}>{requests.length}</div>
+          <div style={{ fontSize: 11, color: '#065f46' }}>طلب دعاء</div>
+        </div>
+        <div style={{ 
+          flex: 1, 
+          background: '#eff6ff', 
+          borderRadius: 12, 
+          padding: 12, 
+          textAlign: 'center' 
+        }}>
+          <div style={{ fontSize: 24, fontWeight: 700, color: '#2563eb' }}>
+            {requests.reduce((sum, r) => sum + r.prayersCount, 0)}
+          </div>
+          <div style={{ fontSize: 11, color: '#1e40af' }}>دعوة</div>
+        </div>
       </div>
 
-      {/* رسالة التنبيه (Toast) */}
+      {/* قائمة الطلبات */}
+      {requests.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '40px 20px', color: '#94a3b8' }}>
+          <div style={{ fontSize: 48, marginBottom: 12 }}>🤲</div>
+          <p>لا توجد طلبات حالياً</p>
+          <p style={{ fontSize: 13 }}>كن أول من يطلب الدعاء!</p>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {requests.map(req => {
+            const isPrayed = prayedForIds[req.id]
+            return (
+              <div
+                key={req.id}
+                style={{
+                  background: '#fff',
+                  border: isPrayed ? '2px solid #10b981' : '1px solid #e2e8f0',
+                  borderRadius: 16,
+                  padding: 14,
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
+                  transition: 'all 0.2s'
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ 
+                      width: 32, 
+                      height: 32, 
+                      borderRadius: '50%', 
+                      background: 'linear-gradient(135deg, #10b981, #059669)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#fff',
+                      fontSize: 14
+                    }}>🙏</span>
+                    <h5 style={{ fontWeight: 700, color: '#1e293b', fontSize: 14, margin: 0 }}>{req.name}</h5>
+                  </div>
+                  <span style={{ fontSize: 10, color: '#94a3b8' }}>{getTimeAgo(req.createdAt)}</span>
+                </div>
+
+                <p style={{ 
+                  color: '#334155', 
+                  fontSize: 14, 
+                  lineHeight: 1.7, 
+                  marginBottom: 12,
+                  background: '#f8fafc',
+                  padding: '10px 12px',
+                  borderRadius: 8,
+                  fontFamily: amiri
+                }}>
+                  {req.reason}
+                </p>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: 12, color: '#64748b', display: 'flex', alignItems: 'center', gap: 4 }}>
+                    🤲 <strong style={{ color: '#059669' }}>{req.prayersCount}</strong> دعوا له
+                  </span>
+
+                  <button
+                    onClick={() => handlePray(req.id)}
+                    disabled={isPrayed}
+                    style={{
+                      padding: '8px 16px',
+                      borderRadius: 8,
+                      border: 'none',
+                      background: isPrayed 
+                        ? '#ecfdf5' 
+                        : 'linear-gradient(135deg, #059669, #047857)',
+                      color: isPrayed ? '#10b981' : '#fff',
+                      fontWeight: 700,
+                      fontSize: 13,
+                      cursor: isPrayed ? 'default' : 'pointer',
+                      transition: 'all 0.2s',
+                      boxShadow: isPrayed ? 'none' : '0 2px 8px rgba(5,150,105,0.3)'
+                    }}
+                  >
+                    {isPrayed ? '✓ دعوت له' : '🤲 ادعُ له'}
+                  </button>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* زر التحديث */}
+      <button
+        onClick={() => { setLoading(true); fetchRequests() }}
+        style={{
+          width: '100%',
+          marginTop: 16,
+          padding: 12,
+          borderRadius: 10,
+          border: '1px solid #d1fae5',
+          background: '#fff',
+          color: '#059669',
+          fontWeight: 600,
+          fontSize: 13,
+          cursor: 'pointer'
+        }}
+      >
+        🔄 تحديث القائمة
+      </button>
+
+      {/* رسالة التنبيه */}
       {toastMessage && (
         <div style={{
           position: 'fixed',
@@ -1750,11 +1874,11 @@ function DuaRequests() {
           transform: 'translateX(-50%)',
           background: '#047857',
           color: '#fff',
-          padding: '10px 20px',
+          padding: '12px 24px',
           borderRadius: 999,
           fontSize: 14,
           fontWeight: 700,
-          boxShadow: '0 10px 25px rgba(4, 120, 87, 0.3)',
+          boxShadow: '0 10px 25px rgba(4, 120, 87, 0.4)',
           zIndex: 100,
           animation: 'fadeIn 0.3s'
         }}>
@@ -1772,7 +1896,7 @@ const tabConfig: { id: Tab; label: string; icon: string; bg: string }[] = [
   { id: 'quran', label: 'المصحف', icon: '📖', bg: '#2563eb' },
   { id: 'tasbeeh', label: 'المسبحة', icon: '📿', bg: '#059669' },
   { id: 'azkar', label: 'الأذكار', icon: '🤲', bg: '#d97706' },
-  { id: 'duarequests', label: 'ادعوا لي', icon: '🧎', bg: '#0d9488' },
+  { id: 'duarequests', label: 'ادعوا لي', icon: '🧎', bg: '#047857' },
   { id: 'khatma', label: 'الختمة', icon: '✅', bg: '#b45309' },
   { id: 'quiz', label: 'مسابقة', icon: '🧠', bg: '#7c3aed' },
   { id: 'eid', label: 'العيد', icon: '🌙', bg: '#dc2626' },
@@ -1813,7 +1937,6 @@ export default function App() {
       </header>
 
       <main style={{ maxWidth: 512, margin: '0 auto', padding: '20px 16px' }}>
-        {/* التبويبات */}
         <div style={{ 
           display: 'grid',
           gridTemplateColumns: 'repeat(7, 1fr)',
