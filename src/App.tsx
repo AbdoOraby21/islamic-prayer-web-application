@@ -1426,16 +1426,13 @@ function Quiz() {
 }
 
 // ========== Dua Requests (ادعوا لي بظهر الغيب) ==========
-// نظام جماعي حقيقي ومباشر يعتمد على ملفك في JSONBin.io
+// قائمة جماعية مباشرة - الكل يشوف الكل
 
-// قائمة المفاتيح الخاصة بك مع نظام الفولباك الذكي لضمان الصلاحيات
 const KEYS = [
   '$2a$10$o1kfRBLmEyXVEWiFT3OQyed3IYME4ZKvTEz9hBXbv2PVlWOg4.102',
   '$2a$10$Zj9Cb9wJmNpdpmoktLgKhe4yPWSGVEF3Qw4QCaBMNce4EKEiI4foG'
 ]
-
-// ملفك السحابي هو المرجع الافتراضي لجميع المستخدمين
-const DEFAULT_BIN_ID = '6a15d85c0ccfe462544f6061'
+const BIN_ID = '6a15d85c0ccfe462544f6061'
 
 type DuaRequestItem = {
   id: string
@@ -1452,84 +1449,45 @@ const defaultDuaRequests: DuaRequestItem[] = [
 ]
 
 function DuaRequests() {
-  const [activeBinId, setActiveBinId] = useState<string | null>(() => {
-    try { 
-      const saved = localStorage.getItem('dua_active_bin')
-      return saved !== null ? saved : DEFAULT_BIN_ID
-    } catch { return DEFAULT_BIN_ID }
-  })
   const [requests, setRequests] = useState<DuaRequestItem[]>(defaultDuaRequests)
   const [nameInput, setNameInput] = useState('')
   const [reasonInput, setReasonInput] = useState('')
   const [showAddForm, setShowAddForm] = useState(false)
   const [submitting, setSubmitting] = useState(false)
-  const [creatingBin, setCreatingBin] = useState(false)
-  const [joinInput, setJoinInput] = useState('')
-  const [showJoinForm, setShowJoinForm] = useState(false)
   const [prayedForIds, setPrayedForIds] = useState<Record<string, boolean>>(() => {
     try { return JSON.parse(localStorage.getItem('prayed_for_ids') || '{}') } catch { return {} }
   })
   const [toastMessage, setToastMessage] = useState<string | null>(null)
 
-  // حفظ الأشخاص اللي دعينا لهم محلياً لعدم التكرار
   useEffect(() => {
     try { localStorage.setItem('prayed_for_ids', JSON.stringify(prayedForIds)) } catch {}
   }, [prayedForIds])
 
-  // التحقق من وجود كود الغرفة في الرابط
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    const room = params.get('duaroom')
-    if (room) {
-      setActiveBinId(room)
-      try { localStorage.setItem('dua_active_bin', room) } catch {}
-    }
-  }, [])
-
-  // جلب البيانات مع نظام التكرار الذكي للمفاتيح
+  // جلب البيانات من السيرفر
   const fetchRequests = useCallback(async () => {
-    if (!activeBinId) {
-      try {
-        const local = JSON.parse(localStorage.getItem('dua_requests_local') || '[]')
-        if (local.length > 0) setRequests(local)
-      } catch {}
-      return
-    }
-
-    let success = false
     for (const key of KEYS) {
       try {
-        const res = await fetch(`https://api.jsonbin.io/v3/b/${activeBinId}/latest`, {
+        const res = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, {
           headers: { 'X-Master-Key': key }
         })
         if (res.ok) {
           const data = await res.json()
           const items: DuaRequestItem[] = data.record?.requests || []
-          if (items.length > 0) {
-            const sorted = items.sort((a, b) => b.createdAt - a.createdAt).slice(0, 60)
-            setRequests(sorted)
-            localStorage.setItem('dua_requests_backup_' + activeBinId, JSON.stringify(sorted))
-          }
-          success = true
-          break
-        } else if (res.status === 404) {
-          setActiveBinId(null)
-          localStorage.removeItem('dua_active_bin')
-          showToast('قائمة الدعاء هذه لم تعد موجودة')
+          const sorted = items.length > 0 
+            ? items.sort((a, b) => b.createdAt - a.createdAt).slice(0, 60) 
+            : defaultDuaRequests
+          setRequests(sorted)
+          localStorage.setItem('dua_backup', JSON.stringify(sorted))
           return
         }
-      } catch (err) {
-        // الاستمرار وتجربة المفتاح التالي
-      }
-    }
-
-    if (!success) {
-      try {
-        const backup = JSON.parse(localStorage.getItem('dua_requests_backup_' + activeBinId) || '[]')
-        if (backup.length > 0) setRequests(backup)
       } catch {}
     }
-  }, [activeBinId])
+    // فشل الاتصال - جلب النسخة الاحتياطية المحلية
+    try {
+      const backup = JSON.parse(localStorage.getItem('dua_backup') || '[]')
+      if (backup.length > 0) setRequests(backup)
+    } catch {}
+  }, [])
 
   useEffect(() => {
     fetchRequests()
@@ -1537,76 +1495,21 @@ function DuaRequests() {
     return () => clearInterval(interval)
   }, [fetchRequests])
 
-  // حفظ البيانات مع نظام التكرار الذكي
+  // حفظ البيانات على السيرفر
   const saveRequests = async (newRequests: DuaRequestItem[]) => {
     setRequests(newRequests)
+    localStorage.setItem('dua_backup', JSON.stringify(newRequests))
 
-    if (!activeBinId) {
-      try { localStorage.setItem('dua_requests_local', JSON.stringify(newRequests)) } catch {}
-      return
-    }
-
-    try {
-      localStorage.setItem('dua_requests_backup_' + activeBinId, JSON.stringify(newRequests))
-      for (const key of KEYS) {
-        const res = await fetch(`https://api.jsonbin.io/v3/b/${activeBinId}`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Master-Key': key
-          },
-          body: JSON.stringify({ requests: newRequests })
-        })
-        if (res.ok) break
-      }
-    } catch (err) {
-      console.error('Save error:', err)
-    }
-  }
-
-  // إنشاء قائمة سحابية جديدة
-  const handleCreateSharedList = async () => {
-    setCreatingBin(true)
-    let success = false
     for (const key of KEYS) {
       try {
-        const res = await fetch('https://api.jsonbin.io/v3/b', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Master-Key': key,
-            'X-Bin-Private': 'false'
-          },
-          body: JSON.stringify({ requests })
+        const res = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', 'X-Master-Key': key },
+          body: JSON.stringify({ requests: newRequests })
         })
-        if (res.ok) {
-          const data = await res.json()
-          const newId = data.metadata.id
-          setActiveBinId(newId)
-          localStorage.setItem('dua_active_bin', newId)
-          showToast('🎉 تم إنشاء قائمتك السحابية المشتركة بنجاح!')
-          success = true
-          break
-        }
-      } catch (err) {
-        // الاستمرار
-      }
+        if (res.ok) return
+      } catch {}
     }
-    if (!success) {
-      showToast('تعذر الاتصال بالسيرفر')
-    }
-    setCreatingBin(false)
-  }
-
-  const handleJoinList = (e: React.FormEvent) => {
-    e.preventDefault()
-    const clean = joinInput.trim()
-    if (!clean) return
-    setActiveBinId(clean)
-    localStorage.setItem('dua_active_bin', clean)
-    setJoinInput('')
-    setShowJoinForm(false)
-    showToast('تم الانضمام للقائمة المشتركة')
   }
 
   const showToast = (msg: string) => {
@@ -1619,7 +1522,6 @@ function DuaRequests() {
     const minutes = Math.floor(diff / 60000)
     const hours = Math.floor(diff / 3600000)
     const days = Math.floor(diff / 86400000)
-    
     if (minutes < 1) return 'الآن'
     if (minutes < 60) return `منذ ${minutes} دقيقة`
     if (hours < 24) return `منذ ${hours} ساعة`
@@ -1629,7 +1531,6 @@ function DuaRequests() {
   const handleAddRequest = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!nameInput.trim() || !reasonInput.trim()) return
-
     setSubmitting(true)
 
     const newItem: DuaRequestItem = {
@@ -1640,9 +1541,7 @@ function DuaRequests() {
       createdAt: Date.now()
     }
 
-    const newRequests = [newItem, ...requests].slice(0, 60)
-    await saveRequests(newRequests)
-
+    await saveRequests([newItem, ...requests].slice(0, 60))
     setNameInput('')
     setReasonInput('')
     setShowAddForm(false)
@@ -1652,29 +1551,9 @@ function DuaRequests() {
 
   const handlePray = async (id: string) => {
     if (prayedForIds[id]) return
-
     setPrayedForIds(prev => ({ ...prev, [id]: true }))
-    
-    const newRequests = requests.map(req => {
-      if (req.id === id) {
-        return { ...req, prayersCount: req.prayersCount + 1 }
-      }
-      return req
-    })
-    
-    await saveRequests(newRequests)
+    await saveRequests(requests.map(r => r.id === id ? { ...r, prayersCount: r.prayersCount + 1 } : r))
     showToast('تقبل الله منك! ولك بالمثل 🤲')
-  }
-
-  const shareUrl = activeBinId 
-    ? `${window.location.origin}${window.location.pathname}?duaroom=${activeBinId}`
-    : ''
-
-  const copyShareLink = () => {
-    if (!shareUrl) return
-    navigator.clipboard?.writeText(shareUrl).then(() => {
-      showToast('✅ تم نسخ رابط المشاركة بنجاح')
-    })
   }
 
   return (
@@ -1683,154 +1562,17 @@ function DuaRequests() {
         <span style={styles.badge('#f0fdf4', '#047857')}>🤲 ادعوا لي بظهر الغيب</span>
       </div>
 
-      {/* لوحة التحكم بالمشاركة السحابية */}
-      {!activeBinId ? (
-        <div style={{ 
-          background: 'linear-gradient(135deg, #f8fafc, #f1f5f9)',
-          border: '2px dashed #cbd5e1',
-          borderRadius: 16,
-          padding: 16,
-          marginBottom: 20,
-          textAlign: 'center'
-        }}>
-          <h4 style={{ color: '#1e293b', marginBottom: 8, fontSize: 15 }}>🌐 هل ترغب في مشاركة دعائك مع الآخرين؟</h4>
-          <p style={{ color: '#475569', fontSize: 13, lineHeight: 1.6, marginBottom: 14 }}>
-            أنت الآن في الوضع المحلي. يمكنك إنشاء قائمة سحابية مشتركة بضغطة زر ومشاركة رابطها مع أهلك وأصدقائك ليراها الجميع ويدعو لك!
-          </p>
-          
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
-            <button
-              onClick={handleCreateSharedList}
-              disabled={creatingBin}
-              style={{
-                padding: '10px 18px',
-                borderRadius: 10,
-                border: 'none',
-                background: 'linear-gradient(135deg, #059669, #047857)',
-                color: '#fff',
-                fontWeight: 700,
-                fontSize: 13,
-                cursor: creatingBin ? 'wait' : 'pointer',
-                boxShadow: '0 2px 8px rgba(5,150,105,0.3)'
-              }}
-            >
-              {creatingBin ? '⏳ جاري الإنشاء...' : '✨ إنشاء قائمة مشتركة'}
-            </button>
-            
-            <button
-              onClick={() => setShowJoinForm(!showJoinForm)}
-              style={{
-                padding: '10px 18px',
-                borderRadius: 10,
-                border: '1px solid #cbd5e1',
-                background: '#fff',
-                color: '#334155',
-                fontWeight: 600,
-                fontSize: 13,
-                cursor: 'pointer'
-              }}
-            >
-              🔗 الانضمام لقائمة
-            </button>
-          </div>
-
-          {showJoinForm && (
-            <form onSubmit={handleJoinList} style={{ marginTop: 12, display: 'flex', gap: 6 }}>
-              <input
-                type="text"
-                placeholder="أدخل كود القائمة هنا..."
-                value={joinInput}
-                onChange={e => setJoinInput(e.target.value)}
-                style={{ flex: 1, padding: '8px 12px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: 13, textAlign: 'center', direction: 'ltr' }}
-                required
-              />
-              <button type="submit" style={{ padding: '8px 14px', borderRadius: 8, border: 'none', background: '#2563eb', color: '#fff', fontWeight: 700, fontSize: 13 }}>
-                دخول
-              </button>
-            </form>
-          )}
-        </div>
-      ) : (
-        <div style={{ 
-          background: 'linear-gradient(135deg, #ecfdf5, #d1fae5)',
-          border: '2px solid #10b981',
-          borderRadius: 16,
-          padding: 16,
-          marginBottom: 20,
-          textAlign: 'center'
-        }}>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#059669', color: '#fff', padding: '4px 12px', borderRadius: 999, fontSize: 11, fontWeight: 700, marginBottom: 10 }}>
-            <span>✓</span> قائمة سحابية مشتركة
-          </div>
-          
-          <p style={{ color: '#065f46', fontSize: 13, marginBottom: 12 }}>
-            أي شخص يفتح رابط المشاركة سيرى هذه القائمة ويمكنه إضافة أدعيته والدعاء للآخرين.
-          </p>
-
-          <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-            <button
-              onClick={copyShareLink}
-              style={{
-                flex: 1,
-                padding: '10px',
-                borderRadius: 10,
-                border: 'none',
-                background: '#059669',
-                color: '#fff',
-                fontWeight: 700,
-                fontSize: 13,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 6
-              }}
-            >
-              <span>🔗</span> نسخ رابط المشاركة
-            </button>
-
-            <button
-              onClick={() => {
-                navigator.clipboard?.writeText(activeBinId).then(() => {
-                  showToast('✅ تم نسخ كود القائمة')
-                })
-              }}
-              style={{
-                padding: '10px 14px',
-                borderRadius: 10,
-                border: '1px solid #059669',
-                background: '#fff',
-                color: '#059669',
-                fontWeight: 700,
-                fontSize: 13,
-                cursor: 'pointer'
-              }}
-              title="نسخ كود القائمة"
-            >
-              📋 كود القائمة
-            </button>
-          </div>
-
-          <button
-            onClick={() => {
-              setActiveBinId(null)
-              localStorage.removeItem('dua_active_bin')
-              showToast('تم الرجوع للقائمة المحلية')
-            }}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              color: '#dc2626',
-              fontWeight: 600,
-              fontSize: 12,
-              cursor: 'pointer',
-              textDecoration: 'underline'
-            }}
-          >
-            🚪 الخروج للوضع المحلي
-          </button>
-        </div>
-      )}
+      <div style={{ 
+        background: 'linear-gradient(135deg, #ecfdf5, #d1fae5)',
+        border: '1px solid #6ee7b7',
+        borderRadius: 12,
+        padding: 14,
+        marginBottom: 20
+      }}>
+        <p style={{ color: '#065f46', fontSize: 13, textAlign: 'center', lineHeight: 1.8, fontFamily: amiri, margin: 0 }}>
+          ❝ دعوة المرء المسلم لأخيه بظهر الغيب مستجابة، عند رأسه ملك موكل كلما دعا لأخيه بخير، قال الملك: آمين ولك بالمثل ❞
+        </p>
+      </div>
 
       {/* زر إضافة طلب جديد */}
       {!showAddForm ? (
