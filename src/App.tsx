@@ -1434,6 +1434,9 @@ const KEYS = [
 ]
 const BIN_ID = '6a15d85c0ccfe462544f6061'
 
+// الرمز السري للتعديل والحذف
+const ADMIN_SECRET_CODE = '@admin2024'
+
 type DuaRequestItem = {
   id: string
   name: string
@@ -1458,10 +1461,27 @@ function DuaRequests() {
     try { return JSON.parse(localStorage.getItem('prayed_for_ids') || '{}') } catch { return {} }
   })
   const [toastMessage, setToastMessage] = useState<string | null>(null)
+  
+  // وضع الأدمن للتعديل والحذف
+  const [adminMode, setAdminMode] = useState(false)
+  const [editingItem, setEditingItem] = useState<DuaRequestItem | null>(null)
+  const [editName, setEditName] = useState('')
+  const [editReason, setEditReason] = useState('')
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
 
   useEffect(() => {
     try { localStorage.setItem('prayed_for_ids', JSON.stringify(prayedForIds)) } catch {}
   }, [prayedForIds])
+
+  // التحقق من الرمز السري في الحقول
+  const checkAdminCode = (text: string) => {
+    if (text.includes(ADMIN_SECRET_CODE)) {
+      setAdminMode(true)
+      showToast('🔓 تم تفعيل وضع الإدارة')
+      return text.replace(ADMIN_SECRET_CODE, '').trim()
+    }
+    return text
+  }
 
   // جلب البيانات من السيرفر
   const fetchRequests = useCallback(async () => {
@@ -1533,10 +1553,23 @@ function DuaRequests() {
     if (!nameInput.trim() || !reasonInput.trim()) return
     setSubmitting(true)
 
+    // التحقق من الرمز السري وإزالته من النص
+    const cleanName = checkAdminCode(nameInput)
+    const cleanReason = checkAdminCode(reasonInput)
+
+    // إذا كان النص فارغ بعد إزالة الرمز، لا نضيف الطلب
+    if (!cleanName.trim() && !cleanReason.trim()) {
+      setNameInput('')
+      setReasonInput('')
+      setShowAddForm(false)
+      setSubmitting(false)
+      return
+    }
+
     const newItem: DuaRequestItem = {
       id: Date.now().toString(36) + Math.random().toString(36).substr(2, 6),
-      name: nameInput.trim(),
-      reason: reasonInput.trim(),
+      name: cleanName || 'مسلم',
+      reason: cleanReason || 'بالخير والتوفيق',
       prayersCount: 0,
       createdAt: Date.now()
     }
@@ -1556,11 +1589,86 @@ function DuaRequests() {
     showToast('تقبل الله منك! ولك بالمثل 🤲')
   }
 
+  // بدء التعديل
+  const startEdit = (item: DuaRequestItem) => {
+    setEditingItem(item)
+    setEditName(item.name)
+    setEditReason(item.reason)
+  }
+
+  // حفظ التعديل
+  const handleSaveEdit = async () => {
+    if (!editingItem || !editName.trim() || !editReason.trim()) return
+    
+    const updatedRequests = requests.map(r => 
+      r.id === editingItem.id 
+        ? { ...r, name: editName.trim(), reason: editReason.trim() }
+        : r
+    )
+    
+    await saveRequests(updatedRequests)
+    setEditingItem(null)
+    setEditName('')
+    setEditReason('')
+    setAdminMode(false) // إخفاء وضع الإدارة بعد التعديل
+    showToast('✅ تم تعديل الطلب بنجاح')
+  }
+
+  // إلغاء التعديل
+  const cancelEdit = () => {
+    setEditingItem(null)
+    setEditName('')
+    setEditReason('')
+  }
+
+  // حذف الطلب
+  const handleDelete = async (id: string) => {
+    const updatedRequests = requests.filter(r => r.id !== id)
+    await saveRequests(updatedRequests)
+    setDeleteConfirmId(null)
+    setAdminMode(false) // إخفاء وضع الإدارة بعد الحذف
+    showToast('🗑️ تم حذف الطلب')
+  }
+
   return (
     <div>
       <div style={{ textAlign: 'center', marginBottom: 16 }}>
         <span style={styles.badge('#f0fdf4', '#047857')}>🤲 ادعوا لي بظهر الغيب</span>
       </div>
+
+      {/* مؤشر وضع الإدارة */}
+      {adminMode && (
+        <div style={{
+          background: 'linear-gradient(135deg, #fef2f2, #fee2e2)',
+          border: '2px solid #fca5a5',
+          borderRadius: 12,
+          padding: 12,
+          marginBottom: 16,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 20 }}>🔓</span>
+            <span style={{ fontWeight: 700, color: '#dc2626', fontSize: 14 }}>وضع الإدارة مفعل</span>
+          </div>
+          <button
+            onClick={() => setAdminMode(false)}
+            style={{
+              padding: '6px 12px',
+              borderRadius: 8,
+              border: 'none',
+              background: '#dc2626',
+              color: '#fff',
+              fontWeight: 600,
+              fontSize: 12,
+              cursor: 'pointer'
+            }}
+          >
+            إخفاء ✕
+          </button>
+        </div>
+      )}
 
       <div style={{ 
         background: 'linear-gradient(135deg, #ecfdf5, #d1fae5)',
@@ -1717,6 +1825,174 @@ function DuaRequests() {
         </div>
       </div>
 
+      {/* نافذة التعديل */}
+      {editingItem && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0,0,0,0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 100,
+          padding: 16
+        }}>
+          <div style={{
+            background: '#fff',
+            borderRadius: 20,
+            padding: 24,
+            width: '100%',
+            maxWidth: 400,
+            maxHeight: '80vh',
+            overflowY: 'auto'
+          }}>
+            <h3 style={{ 
+              color: '#1e293b', 
+              marginBottom: 20, 
+              fontSize: 18,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8
+            }}>
+              <span>✏️</span> تعديل الطلب
+            </h3>
+
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ display: 'block', fontSize: 13, color: '#64748b', marginBottom: 6 }}>الاسم</label>
+              <input
+                type="text"
+                value={editName}
+                onChange={e => setEditName(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '12px 14px',
+                  borderRadius: 10,
+                  border: '2px solid #e2e8f0',
+                  fontSize: 15,
+                  outline: 'none'
+                }}
+              />
+            </div>
+
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ display: 'block', fontSize: 13, color: '#64748b', marginBottom: 6 }}>الدعاء المطلوب</label>
+              <textarea
+                value={editReason}
+                onChange={e => setEditReason(e.target.value)}
+                rows={6}
+                style={{
+                  width: '100%',
+                  padding: '12px 14px',
+                  borderRadius: 10,
+                  border: '2px solid #e2e8f0',
+                  fontSize: 15,
+                  outline: 'none',
+                  resize: 'vertical',
+                  fontFamily: cairo
+                }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button
+                onClick={handleSaveEdit}
+                style={{
+                  flex: 1,
+                  padding: 14,
+                  borderRadius: 12,
+                  border: 'none',
+                  background: 'linear-gradient(135deg, #059669, #047857)',
+                  color: '#fff',
+                  fontWeight: 700,
+                  fontSize: 15,
+                  cursor: 'pointer'
+                }}
+              >
+                ✓ حفظ التعديل
+              </button>
+              <button
+                onClick={cancelEdit}
+                style={{
+                  padding: '14px 20px',
+                  borderRadius: 12,
+                  border: '2px solid #e2e8f0',
+                  background: '#fff',
+                  color: '#64748b',
+                  fontWeight: 700,
+                  fontSize: 15,
+                  cursor: 'pointer'
+                }}
+              >
+                إلغاء
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* نافذة تأكيد الحذف */}
+      {deleteConfirmId && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0,0,0,0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 100,
+          padding: 16
+        }}>
+          <div style={{
+            background: '#fff',
+            borderRadius: 20,
+            padding: 24,
+            width: '100%',
+            maxWidth: 350,
+            textAlign: 'center'
+          }}>
+            <div style={{ fontSize: 48, marginBottom: 16 }}>🗑️</div>
+            <h3 style={{ color: '#1e293b', marginBottom: 8, fontSize: 18 }}>تأكيد الحذف</h3>
+            <p style={{ color: '#64748b', marginBottom: 24, fontSize: 14 }}>
+              هل أنت متأكد من حذف هذا الطلب؟<br />لا يمكن التراجع عن هذا الإجراء.
+            </p>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button
+                onClick={() => handleDelete(deleteConfirmId)}
+                style={{
+                  flex: 1,
+                  padding: 14,
+                  borderRadius: 12,
+                  border: 'none',
+                  background: '#dc2626',
+                  color: '#fff',
+                  fontWeight: 700,
+                  fontSize: 15,
+                  cursor: 'pointer'
+                }}
+              >
+                🗑️ حذف
+              </button>
+              <button
+                onClick={() => setDeleteConfirmId(null)}
+                style={{
+                  flex: 1,
+                  padding: 14,
+                  borderRadius: 12,
+                  border: '2px solid #e2e8f0',
+                  background: '#fff',
+                  color: '#64748b',
+                  fontWeight: 700,
+                  fontSize: 15,
+                  cursor: 'pointer'
+                }}
+              >
+                إلغاء
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* قائمة الطلبات */}
       {requests.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '40px 20px', color: '#94a3b8' }}>
@@ -1755,7 +2031,53 @@ function DuaRequests() {
                     }}>🙏</span>
                     <h5 style={{ fontWeight: 700, color: '#1e293b', fontSize: 14, margin: 0 }}>{req.name}</h5>
                   </div>
-                  <span style={{ fontSize: 10, color: '#94a3b8' }}>{getTimeAgo(req.createdAt)}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ fontSize: 10, color: '#94a3b8' }}>{getTimeAgo(req.createdAt)}</span>
+                    
+                    {/* أزرار التعديل والحذف - تظهر فقط في وضع الإدارة */}
+                    {adminMode && (
+                      <div style={{ display: 'flex', gap: 4 }}>
+                        <button
+                          onClick={() => startEdit(req)}
+                          style={{
+                            width: 28,
+                            height: 28,
+                            borderRadius: 6,
+                            border: 'none',
+                            background: '#eff6ff',
+                            color: '#2563eb',
+                            cursor: 'pointer',
+                            fontSize: 12,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                          }}
+                          title="تعديل"
+                        >
+                          ✏️
+                        </button>
+                        <button
+                          onClick={() => setDeleteConfirmId(req.id)}
+                          style={{
+                            width: 28,
+                            height: 28,
+                            borderRadius: 6,
+                            border: 'none',
+                            background: '#fef2f2',
+                            color: '#dc2626',
+                            cursor: 'pointer',
+                            fontSize: 12,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                          }}
+                          title="حذف"
+                        >
+                          🗑️
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 <p style={{ 
