@@ -1635,8 +1635,8 @@ function DuaRequests() {
               placeholder="بالشفاء، بالتوفيق، بالذرية الصالحة..."
               value={reasonInput}
               onChange={e => setReasonInput(e.target.value)}
-              rows={3}
-              maxLength={200}
+              rows={6}
+              maxLength={800}
               style={{
                 width: '100%',
                 padding: '10px 12px',
@@ -1644,7 +1644,7 @@ function DuaRequests() {
                 border: '1px solid #d1fae5',
                 fontSize: 14,
                 outline: 'none',
-                resize: 'none',
+                resize: 'vertical',
                 fontFamily: cairo
               }}
               required
@@ -1766,7 +1766,11 @@ function DuaRequests() {
                   background: '#f8fafc',
                   padding: '10px 12px',
                   borderRadius: 8,
-                  fontFamily: amiri
+                  fontFamily: amiri,
+                  whiteSpace: 'pre-wrap',
+                  wordBreak: 'break-word',
+                  overflowWrap: 'break-word',
+                  margin: '0 0 12px 0'
                 }}>
                   {req.reason}
                 </p>
